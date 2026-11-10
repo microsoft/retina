@@ -427,6 +427,13 @@ extends:
                       set -euo pipefail
                       : "${IMAGE_REGISTRY:?imageRegistry is required in prebuilt mode}"
                       : "${IMAGE_NAMESPACE:?imageNamespace is required in prebuilt mode}"
+                      # ADO leaves resources.container.<alias>.tag unset for generic container
+                      # resources, so read the selected tag from this run's resolved image.
+                      if [[ -z "${E2E_IMAGE_TAG:-}" ]]; then
+                        run_url="${SYSTEM_COLLECTIONURI}${SYSTEM_TEAMPROJECTID}/_apis/pipelines/${SYSTEM_DEFINITIONID}/runs/${BUILD_BUILDID}?api-version=7.1"
+                        E2E_IMAGE_TAG=$(curl -fsS -H "Authorization: Bearer $SYSTEM_ACCESSTOKEN" "$run_url" \
+                          | { grep -o '"image":"[^"]*/retina-agent:[^"]*"' || true; } | head -1 | sed 's/.*://; s/"$//')
+                      fi
                       : "${E2E_IMAGE_TAG:?Select a prebuilt image tag on the Resources page}"
                       : "${EVENT_WRITER_IMAGE:?eventWriterImage is required in prebuilt mode}"
                       for input in "$IMAGE_REGISTRY" "$IMAGE_NAMESPACE" "$E2E_IMAGE_TAG" "$EVENT_WRITER_IMAGE"; do
@@ -439,11 +446,12 @@ extends:
                           exit 1
                         fi
                       done
+                      echo "##vso[task.setvariable variable=e2eImageTag]$E2E_IMAGE_TAG"
                     displayName: Validate prebuilt image inputs
                     env:
                       IMAGE_REGISTRY: $(e2eImageRegistry)
                       IMAGE_NAMESPACE: $(e2eImageNamespace)
-                      E2E_IMAGE_TAG: $(e2eImageTag)
+                      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
                       EVENT_WRITER_IMAGE: ${{ parameters.eventWriterImage }}
                 # `make manifest` creates the multi-arch indexes from the
                 # per-platform tags that the image jobs pushed. The OneBranch
