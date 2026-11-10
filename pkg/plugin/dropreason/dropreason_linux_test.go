@@ -4,7 +4,9 @@
 package dropreason
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,6 +19,8 @@ import (
 	"unsafe"
 
 	"github.com/blang/semver/v4"
+	"github.com/cilium/cilium/api/v1/flow"
+	hubblev1 "github.com/cilium/cilium/pkg/hubble/api/v1"
 	"github.com/cilium/ebpf/perf"
 	kcfg "github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/enricher"
@@ -625,5 +629,44 @@ func restoreBackup() {
 		if err := os.Rename(fmt.Sprintf("%s.bak", dynamicHeaderPath), dynamicHeaderPath); err != nil {
 			panic(fmt.Sprintf("failed to restore dynamic header file: %v", err))
 		}
+	}
+}
+
+func TestProcessRecordPorts(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts())
+
+	// The eBPF program stores ports in host byte order, so they must reach the flow unchanged.
+	pkt := kprobePacket{
+		SrcIp:   0x0100000a, // 10.0.0.1
+		DstIp:   0x0200000a, // 10.0.0.2
+		SrcPort: 45294,
+		DstPort: 8080,
+		Proto:   6,
+	}
+	var buf bytes.Buffer
+	require.NoError(t, binary.Write(&buf, binary.LittleEndian, &pkt))
+
+	ch := make(chan *hubblev1.Event, 1)
+	dr := &dropReason{
+		cfg:             cfgPodLevelEnabled,
+		l:               log.Logger().Named(name),
+		recordsChannel:  make(chan perf.Record, 1),
+		externalChannel: ch,
+	}
+	dr.recordsChannel <- perf.Record{RawSample: buf.Bytes()}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	dr.wg.Add(1)
+	go dr.processRecord(ctx, 0)
+
+	select {
+	case ev := <-ch:
+		fl, ok := ev.Event.(*flow.Flow)
+		require.True(t, ok)
+		require.Equal(t, uint32(45294), fl.GetL4().GetTCP().GetSourcePort())
+		require.Equal(t, uint32(8080), fl.GetL4().GetTCP().GetDestinationPort())
+	case <-ctx.Done():
+		t.Fatal("no flow emitted")
 	}
 }
