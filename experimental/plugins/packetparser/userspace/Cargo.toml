@@ -1,0 +1,28 @@
+[package]
+name = "packetparser"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+retina-common = { workspace = true, features = ["userspace"] }
+retina-core.workspace = true
+retina-proto.workspace = true
+
+anyhow.workspace = true
+async-trait.workspace = true
+aya.workspace = true
+aya-log.workspace = true
+bytes.workspace = true
+futures.workspace = true
+libc.workspace = true
+netlink-packet-core.workspace = true
+netlink-packet-route.workspace = true
+netlink-sys.workspace = true
+rtnetlink.workspace = true
+tokio.workspace = true
+tracing.workspace = true
