@@ -124,7 +124,13 @@ func GetStarterClusterTemplate(location string) armcontainerservice.ManagedClust
 			DNSPrefix:               to.Ptr("dnsprefix1"),
 			EnablePodSecurityPolicy: to.Ptr(false),
 			EnableRBAC:              to.Ptr(true),
-			LinuxProfile:            nil,
+			// Entra ID integration is required by tenant policy CloudGov_KubernAuthN_AAD.
+			// Local accounts stay enabled so the tests can use admin credentials.
+			AADProfile: &armcontainerservice.ManagedClusterAADProfile{
+				Managed:         to.Ptr(true),
+				EnableAzureRBAC: to.Ptr(false),
+			},
+			LinuxProfile: nil,
 			NetworkProfile: &armcontainerservice.NetworkProfile{
 				LoadBalancerSKU: to.Ptr(armcontainerservice.LoadBalancerSKUStandard),
 				OutboundType:    to.Ptr(armcontainerservice.OutboundTypeLoadBalancer),
