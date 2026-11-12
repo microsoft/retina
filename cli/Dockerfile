@@ -29,7 +29,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261027@sha256:88fc2b4a425801b3b4d8fe5342e24fb6134669fb718ec970340bdd36dee50c35 AS libs
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261105@sha256:bfb630450e9c3d7428d59f25ce6df95ba5634d664d96b06017aa56f87da5ec0e AS libs
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     krb5-1.21.3-6.azl3 \
@@ -43,7 +43,7 @@ RUN tdnf install -y \
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261027@sha256:ca4f1b9b5d4bb21445fbf5cf7288063ea477a9fa88affa4b13757245e3214914 AS distroless-target
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261105@sha256:bc4d9a4e0d3317999e235cb5895dde28bf766d25533ae8e6ba311bd6d253f996 AS distroless-target
 COPY --from=libs /lib/ /lib
 COPY --from=libs /usr/lib/ /usr/lib
 COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
@@ -55,7 +55,7 @@ COPY --from=builder /workspace/kubectl-retina .
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261027@sha256:88fc2b4a425801b3b4d8fe5342e24fb6134669fb718ec970340bdd36dee50c35 AS shell-target
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261105@sha256:bfb630450e9c3d7428d59f25ce6df95ba5634d664d96b06017aa56f87da5ec0e AS shell-target
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     krb5-1.21.3-6.azl3 \
