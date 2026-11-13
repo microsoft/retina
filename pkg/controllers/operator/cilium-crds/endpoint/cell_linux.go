@@ -5,5 +5,6 @@ import "github.com/cilium/hive/cell"
 var Cell = cell.Module(
 	"endpointcontroller",
 	"controller for cilium endpoint and identity creation and updates",
+	cell.Config(defaultConfig),
 	cell.Invoke(registerEndpointController),
 )
