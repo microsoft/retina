@@ -24,7 +24,7 @@ FROM --platform=windows/amd64 ${BUILDER_IMAGE} as pktmon-builder
 WORKDIR C:\\retina
 
 # skopeo inspect docker://mcr.microsoft.com/windows/nanoserver:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
-FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022@sha256:62d28cb7771b0cf1b37db2662e468dad76e7ef15ca4ef52b2ab73c102a23da98 AS final
+FROM --platform=windows/amd64 mcr.microsoft.com/windows/nanoserver:ltsc2022@sha256:5a1c3c8308f8f5c9b67d21d2332a449d4ab8f9a6cf277f07d4aeac27ff2a0213 AS final
 ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'Continue';"]
 COPY --from=builder C:\\retina\\windows\\kubeconfigtemplate.yaml kubeconfigtemplate.yaml
