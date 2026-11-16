@@ -20,6 +20,7 @@ import (
 	ciliumutil "github.com/microsoft/retina/pkg/utils/testutil/cilium"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func podTestX() (resource.Key, *v1.Pod) {
@@ -678,14 +679,16 @@ func newTestEndpointReconciler(t *testing.T) (*endpointReconciler, *ciliumutil.M
 		podEvents:           nil,
 		ciliumEndpoints:     ciliumEndpoints,
 		ciliumSlimClientSet: fakeClientSet.SlimFakeClientset,
+		k8sClient:           fakeClientSet,
 		store:               NewStore(),
 		Mutex:               &sync.Mutex{},
+		windowsNodes:        make(map[string]bool),
 	}
 
 	// make sure to use CRD mode (this is referenced in InitIdentityAllocator)
 	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
 	// Use the Cilium fake clientset for identity manager since it has proper watch support
-	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset)
+	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset, false)
 	require.NoError(t, err)
 	r.identityManager = im
 
@@ -706,4 +709,60 @@ func getAndAssertCEPExists(t *testing.T, ciliumEndpoints *ciliumutil.MockResourc
 	require.NoError(t, err)
 	require.True(t, ok, "cilium endpoint should exist")
 	return cep
+}
+
+func createNode(t *testing.T, c corev1.CoreV1Interface, name, os string) {
+	t.Helper()
+	_, err := c.Nodes().Create(context.TODO(), &v1.Node{
+		ObjectMeta: slim_metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"kubernetes.io/os": os},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
+
+func podOnNode(name, node, ip string) (resource.Key, *v1.Pod) {
+	key, pod := podTestX()
+	key.Name = name
+	pod.Name = name
+	pod.UID = "uid-" + types.UID(name)
+	pod.Spec.NodeName = node
+	pod.Status.PodIP = ip
+	return key, pod
+}
+
+func TestWindowsOnlyEndpointsSkipsLinuxPods(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	r.cfg = Config{WindowsOnlyEndpoints: true}
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "linux-node", "linux")
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
+
+	linuxKey, linuxPod := podOnNode("linux-pod", "linux-node", "10.244.0.5")
+	require.NoError(t, r.ReconcilePod(context.TODO(), linuxKey, linuxPod))
+	_, ok := r.store.GetPod(linuxKey)
+	require.False(t, ok, "linux pod must not be managed")
+	assertCEPDoesNotExist(t, ciliumEndpoints, linuxKey)
+	require.NoError(t, r.HandlePodDelete(context.TODO(), linuxKey))
+
+	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	require.Contains(t, cep.Status.Identity.Labels, "k8s:k1=v1")
+
+	// Reconciling again with unchanged labels must not allocate a new identity.
+	id := cep.Status.Identity.ID
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	require.Equal(t, id, getAndAssertCEPExists(t, ciliumEndpoints, winPod).Status.Identity.ID)
+}
+
+func TestDefaultConfigUnchanged(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	// No node objects exist: the default config must not look up node OS.
+	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	getAndAssertCEPExists(t, ciliumEndpoints, winPod)
 }
