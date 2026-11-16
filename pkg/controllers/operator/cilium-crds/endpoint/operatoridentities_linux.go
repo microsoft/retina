@@ -26,12 +26,19 @@ const (
 	ciliumConfigLabelPrefixFile        = option.LabelPrefixFile
 )
 
-var ErrIdentityModeNotOperator = errors.New("--" + ReuseOperatorIdentities + " requires " +
-	ciliumConfigIdentityManagementMode + "=" + option.IdentityManagementModeOperator + " in " + ciliumConfigNamespace + "/" + ciliumConfigName)
+var (
+	ErrIncompatibleFlags = errors.New("--" + ReuseOperatorIdentities + " and --" + WindowsCIDRLabels +
+		" are incompatible: cilium-operator never creates identities with cidr: or cidrgroup: labels")
+	ErrIdentityModeNotOperator = errors.New("--" + ReuseOperatorIdentities + " requires " +
+		ciliumConfigIdentityManagementMode + "=" + option.IdentityManagementModeOperator + " in " + ciliumConfigNamespace + "/" + ciliumConfigName)
+)
 
 // setupOperatorIdentities makes identity labels match the CiliumIdentities created by cilium-operator.
 // It configures the process-global label filter and cluster name from cilium-config, so it must run before any worker.
 func (r *endpointReconciler) setupOperatorIdentities(ctx context.Context) error {
+	if err := r.cfg.Validate(); err != nil {
+		return err
+	}
 	if r.k8sClient == nil {
 		return errors.Wrap(ErrClientsetDisabled, "kubernetes client is required to read "+ciliumConfigName)
 	}

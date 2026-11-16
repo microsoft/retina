@@ -56,4 +56,13 @@ rules:
     - get
     - list
     - watch
+  # for CIDR group labels on Windows Pod identities (--windows-cidr-labels)
+  - apiGroups:
+    - cilium.io
+    resources:
+    - ciliumcidrgroups
+    verbs:
+    - get
+    - list
+    - watch
 {{- end -}}

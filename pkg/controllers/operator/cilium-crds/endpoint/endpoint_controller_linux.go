@@ -80,6 +80,12 @@ type endpointReconciler struct {
 	cfg Config
 	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
 	windowsNodes map[string]bool
+
+	// cidrGroups is watched when WindowsCIDRLabels is set, to add CIDR group labels to Windows Pods.
+	cidrGroups         resource.Resource[*ciliumv2.CiliumCIDRGroup]
+	cidrGroupCache     *cidrGroupCache
+	cidrGroupsSynced   chan struct{}
+	cidrGroupsSyncOnce sync.Once
 }
 
 type params struct {
@@ -90,12 +96,16 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	CIDRGroups      resource.Resource[*ciliumv2.CiliumCIDRGroup]
 	Config          Config
 }
 
 func registerEndpointController(p params) error {
 	if !p.Clientset.IsEnabled() {
 		return ErrClientsetDisabled
+	}
+	if err := p.Config.Validate(); err != nil {
+		return err
 	}
 
 	l := retinalog.SlogLogger().With("component", "endpointcontroller")
@@ -111,10 +121,14 @@ func registerEndpointController(p params) error {
 		store:               NewStore(),
 		cfg:                 p.Config,
 		windowsNodes:        make(map[string]bool),
+		cidrGroups:          p.CIDRGroups,
+		cidrGroupCache:      newCIDRGroupCache(),
+		cidrGroupsSynced:    make(chan struct{}),
 	}
 
 	l.Info("endpoint controller config",
 		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
+		WindowsCIDRLabels, p.Config.WindowsCIDRLabels,
 		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
 	)
 
@@ -147,6 +161,12 @@ func (r *endpointReconciler) Start(ctx cell.HookContext) error {
 		return errors.Wrap(err, "failed to submit task to namespace workerpool")
 	}
 
+	if r.cidrGroupLabelsEnabled() {
+		if err := r.wp.Submit("cidrgroup-controller", r.runCIDRGroupEvents); err != nil {
+			return errors.Wrap(err, "failed to submit task to cidrgroup workerpool")
+		}
+	}
+
 	if err := r.wp.Submit("endpoint-reconciler", r.run); err != nil {
 		return errors.Wrap(err, "failed to submit task to endpoint workerpool")
 	}
@@ -165,6 +185,7 @@ func (r *endpointReconciler) Stop(_ cell.HookContext) error {
 func (r *endpointReconciler) run(pctx context.Context) error {
 	r.l.Info("start to reconcile Pods for CiliumEndpoints")
 
+	r.waitForCIDRGroups(pctx)
 	podEvents := r.pods.Events(pctx)
 
 	for {
@@ -446,7 +467,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 
 				if oldCEP.Status.Identity != nil {
 					oldPEP.identityID = oldCEP.Status.Identity.ID
-					oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
+					oldPEP.lbls = keyCIDRLabelsLikeCilium(labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels))
 				}
 			}
 		}
@@ -720,12 +741,43 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		// Same key as cilium-operator's CID controller, so the identity it created is found.
 		lbls = identitykey.GetCIDKeyFromLabels(ciliumLabels, labels.LabelSourceK8s).Labels()
 	} else {
-		lbls = make(labels.Labels, len(ciliumLabels))
+		lbls = make(labels.Labels, len(ciliumLabels)+1)
 		for k, v := range ciliumLabels {
 			lbls[k] = labels.Label{
 				Key:    k,
 				Value:  v,
 				Source: labels.LabelSourceK8s,
+			}
+		}
+	}
+
+	ipv4, ipv6 := podAddrs(pod)
+	addrs := validAddrs(ipv4, ipv6)
+	if r.cfg.WindowsCIDRLabels && len(addrs) > 0 {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine node OS")
+		}
+		if isWindows {
+			// Cilium only matches CIDR selectors against identities carrying cidr: labels.
+			// Without this, giving a Windows Pod an endpoint identity makes it unselectable by CIDR policy.
+			// A dual-stack Pod gets one label per family, like a Cilium prefix identity per address.
+			for _, addr := range addrs {
+				cidrLabel, err := labels.IPStringToLabel(addr.String())
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to build CIDR label")
+				}
+				lbls[cidrLabel.Key] = cidrLabel
+			}
+
+			// cidrGroupRef/cidrGroupSelector rules match cidrgroup: labels, which Cilium only puts on its own prefix identities.
+			if r.cidrGroupLabelsEnabled() {
+				for k, l := range r.cidrGroupCache.labelsFor(addrs...) {
+					// Labels are keyed without source; never let a group label replace a Pod label.
+					if _, exists := lbls[k]; !exists {
+						lbls[k] = l
+					}
+				}
 			}
 		}
 	}
@@ -775,6 +827,17 @@ func podAddrs(pod *slim_corev1.Pod) (ipv4, ipv6 netip.Addr) {
 	return ipv4, ipv6
 }
 
+// validAddrs returns the valid addresses among addrs, in order.
+func validAddrs(addrs ...netip.Addr) []netip.Addr {
+	valid := make([]netip.Addr, 0, len(addrs))
+	for _, a := range addrs {
+		if a.IsValid() {
+			valid = append(valid, a)
+		}
+	}
+	return valid
+}
+
 // addrString returns the address in Cilium's CiliumEndpoint format, or "" for the zero netip.Addr.
 func addrString(addr netip.Addr) string {
 	if !addr.IsValid() {
@@ -801,4 +864,23 @@ func cepAddrs(networking *ciliumv2.EndpointNetworking) (ipv4, ipv6 string) {
 		}
 	}
 	return ipv4, ipv6
+}
+
+// keyCIDRLabelsLikeCilium re-keys cidr: labels parsed from a CiliumEndpoint. The printed IPv6 form
+// (cidr:fd00::1/128) parses to a different key than Cilium uses (fd00--1/128), which would make
+// unchanged labels compare unequal. IPv4 keys are unchanged.
+func keyCIDRLabelsLikeCilium(lbls labels.Labels) labels.Labels {
+	for k, l := range lbls {
+		pfx := l.GetCIDRPrefix()
+		if l.Source != labels.LabelSourceCIDR || pfx == nil {
+			continue
+		}
+		keyed, err := labels.IPStringToLabel(pfx.String())
+		if err != nil || keyed.Key == k {
+			continue
+		}
+		delete(lbls, k)
+		lbls[keyed.Key] = keyed
+	}
+	return lbls
 }

@@ -129,6 +129,26 @@ func createCiliumConfig(t *testing.T, r *endpointReconciler, data map[string]str
 }
 
 func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
+	t.Run("incompatible with windows-cidr-labels", func(t *testing.T) {
+		r, _ := newTestEndpointReconciler(t)
+		r.identityManager = nil
+		r.cfg = Config{ReuseOperatorIdentities: true, WindowsCIDRLabels: true}
+		createCiliumConfig(t, r, map[string]string{ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator})
+
+		err := r.Start(context.TODO())
+		require.ErrorIs(t, err, ErrIncompatibleFlags)
+		require.Nil(t, r.identityManager)
+		require.Nil(t, r.wp, "no workers may start")
+	})
+
+	t.Run("incompatible flags rejected at registration, before leader election", func(t *testing.T) {
+		fakeClientSet, _ := ciliumclient.NewFakeClientset(slog.Default())
+		require.ErrorIs(t, registerEndpointController(params{
+			Clientset: fakeClientSet,
+			Config:    Config{ReuseOperatorIdentities: true, WindowsCIDRLabels: true},
+		}), ErrIncompatibleFlags)
+	})
+
 	t.Run("missing cilium-config", func(t *testing.T) {
 		r, _ := newTestEndpointReconciler(t)
 		r.cfg = Config{ReuseOperatorIdentities: true}

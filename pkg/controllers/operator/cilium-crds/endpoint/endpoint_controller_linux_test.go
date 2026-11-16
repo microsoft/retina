@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -735,7 +736,7 @@ func podOnNode(name, node, ip string) (resource.Key, *v1.Pod) {
 
 func TestWindowsOnlyEndpointsSkipsLinuxPods(t *testing.T) {
 	r, ciliumEndpoints := newTestEndpointReconciler(t)
-	r.cfg = Config{WindowsOnlyEndpoints: true}
+	r.cfg = Config{WindowsOnlyEndpoints: true, WindowsCIDRLabels: true}
 	createNamespace(r.ciliumSlimClientSet.CoreV1())
 	createNode(t, r.ciliumSlimClientSet.CoreV1(), "linux-node", "linux")
 	createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
@@ -750,12 +751,28 @@ func TestWindowsOnlyEndpointsSkipsLinuxPods(t *testing.T) {
 	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
 	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
 	cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	require.Contains(t, cep.Status.Identity.Labels, "cidr:10.244.1.57/32")
 	require.Contains(t, cep.Status.Identity.Labels, "k8s:k1=v1")
+	require.NotContains(t, cep.Status.Identity.Labels, "reserved:world")
 
 	// Reconciling again with unchanged labels must not allocate a new identity.
 	id := cep.Status.Identity.ID
 	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
 	require.Equal(t, id, getAndAssertCEPExists(t, ciliumEndpoints, winPod).Status.Identity.ID)
+}
+
+func TestWindowsCIDRLabelsWithoutScoping(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	r.cfg = Config{WindowsCIDRLabels: true}
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "linux-node", "linux")
+
+	linuxKey, linuxPod := podOnNode("linux-pod", "linux-node", "10.244.0.5")
+	require.NoError(t, r.ReconcilePod(context.TODO(), linuxKey, linuxPod))
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, linuxPod)
+	for _, l := range cep.Status.Identity.Labels {
+		require.NotContains(t, l, "cidr:", "linux pods keep upstream CIDR semantics")
+	}
 }
 
 func TestDefaultConfigUnchanged(t *testing.T) {
@@ -765,7 +782,10 @@ func TestDefaultConfigUnchanged(t *testing.T) {
 	// No node objects exist: the default config must not look up node OS.
 	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
 	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
-	getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	for _, l := range cep.Status.Identity.Labels {
+		require.NotContains(t, l, "cidr:")
+	}
 }
 
 const (
@@ -819,7 +839,7 @@ func TestPodDualStackAddressing(t *testing.T) {
 			cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
 			require.Equal(t, ciliumv2.AddressPairList{{IPV4: tt.wantIPv4, IPV6: tt.wantIPv6}}, cep.Status.Networking.Addressing)
 			require.Equal(t, []string{"k8s:io.cilium.k8s.policy.cluster", "k8s:io.kubernetes.pod.namespace=test", "k8s:k1=v1"},
-				cep.Status.Identity.Labels, "IP addresses do not change identity labels")
+				cep.Status.Identity.Labels, "IP addresses do not change identity labels without --windows-cidr-labels")
 		})
 	}
 }
@@ -935,6 +955,104 @@ func TestPodIPv6Changed(t *testing.T) {
 		cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
 		require.Equal(t, step.want, cep.Status.Networking.Addressing, step.name)
 		require.Equal(t, endpointID, cep.Status.ID, step.name)
-		require.Equal(t, identityID, cep.Status.Identity.ID, "%s: identity unchanged", step.name)
+		require.Equal(t, identityID, cep.Status.Identity.ID, "%s: identity unchanged without cidr labels", step.name)
+	}
+}
+
+func TestWindowsCIDRLabelsDualStack(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	r.cfg = Config{WindowsOnlyEndpoints: true, WindowsCIDRLabels: true}
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
+
+	// Cilium keys IPv6 cidr labels with ":" replaced by "-" (and a "0" instead of a leading or
+	// trailing "-"), but prints them with colons in CiliumEndpoint/CiliumIdentity label lists.
+	tests := []struct {
+		name      string
+		podIPs    []string
+		wantKeys  []string
+		wantModel []string
+	}{
+		{"ipv4 only", []string{testIPv4}, []string{"10.244.1.57/32"}, []string{"cidr:10.244.1.57/32"}},
+		{
+			name:      "dual-stack",
+			podIPs:    []string{testIPv4, testIPv6},
+			wantKeys:  []string{"10.244.1.57/32", "fd00-10-244-1--39/128"},
+			wantModel: []string{"cidr:10.244.1.57/32", "cidr:fd00:10:244:1::39/128"},
+		},
+		{"ipv6 only", []string{testIPv6}, []string{"fd00-10-244-1--39/128"}, []string{"cidr:fd00:10:244:1::39/128"}},
+		{"leading ::", []string{"::a"}, []string{"0--a/128"}, []string{"cidr:::a/128"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			winKey, winPod := podOnNode("win-"+strings.ReplaceAll(tt.name, " ", "-"), "win-node", "")
+			withPodIPs(winPod, tt.podIPs...)
+			require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+			pep, ok := r.store.GetPod(winKey)
+			require.True(t, ok)
+
+			var cidrKeys []string
+			for k, l := range pep.lbls {
+				if l.Source == labels.LabelSourceCIDR {
+					cidrKeys = append(cidrKeys, k)
+				}
+			}
+			require.ElementsMatch(t, tt.wantKeys, cidrKeys)
+
+			cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+			var cidrModel []string
+			for _, l := range cep.Status.Identity.Labels {
+				if strings.HasPrefix(l, labels.LabelSourceCIDR+":") {
+					cidrModel = append(cidrModel, l)
+				}
+			}
+			require.ElementsMatch(t, tt.wantModel, cidrModel)
+			require.NotContains(t, cep.Status.Identity.Labels, "reserved:world")
+		})
+	}
+}
+
+// TestExistingCEPCIDRLabelsEqual checks that unchanged cidr labels read back from a CiliumEndpoint
+// at startup compare equal, so the CiliumEndpoint is not patched.
+func TestExistingCEPCIDRLabelsEqual(t *testing.T) {
+	const existingIdentityID = 12345
+	tests := []struct {
+		name   string
+		podIPs []string
+	}{
+		{"ipv4", []string{testIPv4}},
+		{"dual-stack", []string{testIPv4, testIPv6}},
+		{"ipv6", []string{testIPv6}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ciliumEndpoints := newTestEndpointReconciler(t)
+			r.cfg = Config{WindowsOnlyEndpoints: true, WindowsCIDRLabels: true}
+			createNamespace(r.ciliumSlimClientSet.CoreV1())
+			createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
+			podKey, pod := podOnNode("win-pod", "win-node", "")
+			withPodIPs(pod, tt.podIPs...)
+
+			r.Lock()
+			lbls, err := r.ciliumEndpointsLabels(context.TODO(), pod)
+			r.Unlock()
+			require.NoError(t, err)
+			ipv4, ipv6 := podAddrs(pod)
+			ciliumEndpoints.Upsert(&ciliumv2.CiliumEndpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: podKey.Name, Namespace: podKey.Namespace},
+				Status: (&PodEndpoint{
+					endpointID: 1,
+					identityID: existingIdentityID,
+					lbls:       lbls,
+					ipv4:       addrString(ipv4),
+					ipv6:       addrString(ipv6),
+					nodeIP:     pod.Status.HostIP,
+				}).endpointStatus(),
+			})
+
+			require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+			require.Equal(t, int64(existingIdentityID), getAndAssertCEPExists(t, ciliumEndpoints, pod).Status.Identity.ID,
+				"CiliumEndpoint must not be patched")
+		})
 	}
 }

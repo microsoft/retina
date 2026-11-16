@@ -6,6 +6,7 @@
 // - endpoints
 // - endpointslices (required for identitygc)
 // - ciliumnodes (required for endpointgc)
+// - ciliumcidrgroups (CIDR group labels for Windows Pods, see endpoint controller)
 
 package k8s
 
@@ -37,6 +38,7 @@ var ResourcesCell = cell.Module(
 		},
 		PodResource,
 		k8s.NamespaceResource,
+		k8s.CiliumCIDRGroupResource,
 	),
 )
 
