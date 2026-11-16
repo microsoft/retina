@@ -14,10 +14,13 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/operator/cilium-crds/cache"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
+	identitykey "github.com/cilium/cilium/pkg/identity/key"
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -49,6 +52,8 @@ type endpointReconciler struct {
 	l                   *slog.Logger
 	clientset           versioned.Interface
 	ciliumSlimClientSet slim_clientset.Interface
+	// k8sClient reads kube-system/cilium-config when ReuseOperatorIdentities is set.
+	k8sClient kubernetes.Interface
 	// podEvents represents Pod CRUD events relayed from the Pod controller. If the Pod was deleted, the PodCacheObject.Pod field will be nil
 	podEvents chan cache.PodCacheObject
 	// ciliumEndpoints has a store of CiliumEndpoints in API Server
@@ -70,6 +75,10 @@ type endpointReconciler struct {
 	store *Store
 
 	wp *workerpool.WorkerPool
+
+	cfg Config
+	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
+	windowsNodes map[string]bool
 }
 
 type params struct {
@@ -80,6 +89,7 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	Config          Config
 }
 
 func registerEndpointController(p params) error {
@@ -93,11 +103,19 @@ func registerEndpointController(p params) error {
 		l:                   l,
 		clientset:           p.Clientset,
 		ciliumSlimClientSet: p.Clientset.Slim(),
+		k8sClient:           p.Clientset,
 		ciliumEndpoints:     p.CiliumEndpoints,
 		pods:                p.Pods,
 		namespaces:          p.Namespaces,
 		store:               NewStore(),
+		cfg:                 p.Config,
+		windowsNodes:        make(map[string]bool),
 	}
+
+	l.Info("endpoint controller config",
+		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
+		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
+	)
 
 	p.Lifecycle.Append(r)
 
@@ -105,9 +123,16 @@ func registerEndpointController(p params) error {
 }
 
 func (r *endpointReconciler) Start(ctx cell.HookContext) error {
+	if r.cfg.ReuseOperatorIdentities {
+		// Configures process-global label filtering, so it must happen before any worker runs.
+		if err := r.setupOperatorIdentities(ctx); err != nil {
+			return errors.Wrap(err, "failed to set up "+ReuseOperatorIdentities)
+		}
+	}
+
 	// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
 	// There is a way to disable auto-start but then there is no exposed function to simply start().
-	im, err := NewIdentityManager(ctx, r.l, r.clientset)
+	im, err := NewIdentityManager(ctx, r.l, r.clientset, r.cfg.ReuseOperatorIdentities)
 	if err != nil {
 		return errors.Wrap(err, "failed to create identity manager")
 	}
@@ -296,6 +321,17 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
+	}
+
+	if r.cfg.WindowsOnlyEndpoints {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine node OS")
+		}
+		if !isWindows {
+			r.l.Debug("pod is not on a Windows node, skipping", "podKey", podKey.String(), "node", pod.Spec.NodeName)
+			return nil
+		}
 	}
 
 	podLabels, err := r.ciliumEndpointsLabels(ctx, pod)
@@ -675,13 +711,37 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
-	lbls := make(labels.Labels, len(ciliumLabels))
-	for k, v := range ciliumLabels {
-		lbls[k] = labels.Label{
-			Key:    k,
-			Value:  v,
-			Source: labels.LabelSourceK8s,
+	var lbls labels.Labels
+	if r.cfg.ReuseOperatorIdentities {
+		// Same key as cilium-operator's CID controller, so the identity it created is found.
+		lbls = identitykey.GetCIDKeyFromLabels(ciliumLabels, labels.LabelSourceK8s).Labels()
+	} else {
+		lbls = make(labels.Labels, len(ciliumLabels))
+		for k, v := range ciliumLabels {
+			lbls[k] = labels.Label{
+				Key:    k,
+				Value:  v,
+				Source: labels.LabelSourceK8s,
+			}
 		}
 	}
 	return lbls, nil
+}
+
+// isWindowsNode reports whether the node runs Windows, based on the kubernetes.io/os node label.
+// Callers must hold r.Mutex.
+func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string) (bool, error) {
+	if nodeName == "" {
+		return false, nil
+	}
+	if isWindows, ok := r.windowsNodes[nodeName]; ok {
+		return isWindows, nil
+	}
+	node, err := r.ciliumSlimClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get node "+nodeName)
+	}
+	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
+	r.windowsNodes[nodeName] = isWindows
+	return isWindows, nil
 }
