@@ -2,6 +2,7 @@ package endpointcontroller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -765,4 +766,175 @@ func TestDefaultConfigUnchanged(t *testing.T) {
 	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
 	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
 	getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+}
+
+const (
+	testIPv4 = "10.244.1.57"
+	testIPv6 = "fd00:10:244:1::39"
+)
+
+func withPodIPs(pod *v1.Pod, ips ...string) {
+	pod.Status.PodIPs = nil
+	for _, ip := range ips {
+		pod.Status.PodIPs = append(pod.Status.PodIPs, v1.PodIP{IP: ip})
+	}
+	if len(ips) > 0 {
+		pod.Status.PodIP = ips[0]
+	}
+}
+
+func TestPodDualStackAddressing(t *testing.T) {
+	tests := []struct {
+		name     string
+		podIP    string
+		podIPs   []string
+		wantIPv4 string
+		wantIPv6 string
+	}{
+		{name: "ipv4 PodIP only", podIP: testIPv4, wantIPv4: testIPv4},
+		{name: "ipv4 PodIPs", podIPs: []string{testIPv4}, wantIPv4: testIPv4},
+		{name: "dual-stack ipv4 first", podIPs: []string{testIPv4, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "dual-stack ipv6 first", podIPs: []string{testIPv6, testIPv4}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "ipv6 only", podIPs: []string{testIPv6}, wantIPv6: testIPv6},
+		{name: "ipv6 PodIP only", podIP: testIPv6, wantIPv6: testIPv6},
+		{name: "ipv6 canonicalized", podIPs: []string{"FD00:10:244:1:0:0:0:39"}, wantIPv6: testIPv6},
+		{name: "first address per family", podIPs: []string{testIPv4, "10.244.1.58", testIPv6, "fd00::1"}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ciliumEndpoints := newTestEndpointReconciler(t)
+			createNamespace(r.ciliumSlimClientSet.CoreV1())
+			podKey, pod := podTestX()
+			pod.Status.PodIP = tt.podIP
+			if tt.podIPs != nil {
+				withPodIPs(pod, tt.podIPs...)
+			}
+
+			require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+			pep, ok := r.store.GetPod(podKey)
+			require.True(t, ok)
+			require.Equal(t, tt.wantIPv4, pep.ipv4)
+			require.Equal(t, tt.wantIPv6, pep.ipv6)
+
+			cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+			require.Equal(t, ciliumv2.AddressPairList{{IPV4: tt.wantIPv4, IPV6: tt.wantIPv6}}, cep.Status.Networking.Addressing)
+			require.Equal(t, []string{"k8s:io.cilium.k8s.policy.cluster", "k8s:io.kubernetes.pod.namespace=test", "k8s:k1=v1"},
+				cep.Status.Identity.Labels, "IP addresses do not change identity labels")
+		})
+	}
+}
+
+func TestIPv4OnlyCEPStatusUnchanged(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, "1.2.3.4")
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+
+	b, err := json.Marshal(getAndAssertCEPExists(t, ciliumEndpoints, pod).Status.Networking)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"addressing":[{"ipv4":"1.2.3.4"}],"node":"10.0.0.1"}`, string(b))
+}
+
+func TestPodWithUnparsableIPs(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, "not-an-ip")
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	assertCEPDoesNotExist(t, ciliumEndpoints, podKey)
+}
+
+// TestExistingCEPAddressing covers CEPs found in the store at startup (not in the cache).
+func TestExistingCEPAddressing(t *testing.T) {
+	const existingEndpointID = 7
+	tests := []struct {
+		name           string
+		addressing     ciliumv2.AddressPairList
+		podIPs         []string
+		wantEndpointID int64
+	}{
+		{
+			name:           "ipv6 only, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV6: testIPv6}},
+			podIPs:         []string{testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "dual-stack, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: testIPv6}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "dual-stack in separate pairs, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV6: testIPv6}, {IPV4: testIPv4}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "ipv4 only, pod gained ipv6",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv4}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID + 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ciliumEndpoints := newTestEndpointReconciler(t)
+			createNamespace(r.ciliumSlimClientSet.CoreV1())
+			podKey, pod := podTestX()
+			withPodIPs(pod, tt.podIPs...)
+
+			ciliumEndpoints.Upsert(&ciliumv2.CiliumEndpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: podKey.Name, Namespace: podKey.Namespace},
+				Status: ciliumv2.EndpointStatus{
+					ID: existingEndpointID,
+					Identity: &ciliumv2.EndpointIdentity{
+						ID:     12345,
+						Labels: []string{"k8s:io.cilium.k8s.policy.cluster", "k8s:io.kubernetes.pod.namespace=test", "k8s:k1=v1"},
+					},
+					Networking: &ciliumv2.EndpointNetworking{NodeIP: "10.0.0.1", Addressing: tt.addressing},
+					State:      "ready",
+				},
+			})
+
+			require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+			pep, ok := r.store.GetPod(podKey)
+			require.True(t, ok)
+			require.Equal(t, tt.wantEndpointID, pep.endpointID)
+			require.Equal(t, testIPv6, pep.ipv6)
+		})
+	}
+}
+
+func TestPodIPv6Changed(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, testIPv4, testIPv6)
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	pep, _ := r.store.GetPod(podKey)
+	identityID := pep.identityID
+	endpointID := pep.endpointID
+
+	steps := []struct {
+		name   string
+		podIPs []string
+		want   ciliumv2.AddressPairList
+	}{
+		{"ipv6 changed", []string{testIPv4, "fd00:10:244:1::40"}, ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: "fd00:10:244:1::40"}}},
+		{"ipv6 removed", []string{testIPv4}, ciliumv2.AddressPairList{{IPV4: testIPv4}}},
+		{"ipv6 added", []string{testIPv4, testIPv6}, ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: testIPv6}}},
+	}
+	for _, step := range steps {
+		_, pod = podTestX()
+		withPodIPs(pod, step.podIPs...)
+		require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod), step.name)
+		endpointID++
+		cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+		require.Equal(t, step.want, cep.Status.Networking.Addressing, step.name)
+		require.Equal(t, endpointID, cep.Status.ID, step.name)
+		require.Equal(t, identityID, cep.Status.Identity.ID, "%s: identity unchanged", step.name)
+	}
 }
