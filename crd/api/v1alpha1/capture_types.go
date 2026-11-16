@@ -228,6 +228,8 @@ type CaptureConfiguration struct {
 	// - IP neighbor status
 	// - IPtables rule dumps
 	// - Network statistics information
+	// The metadata describes the whole node, so it is only collected for node targets (nodeSelector) and
+	// is skipped for Pod targets (podSelector, podNames).
 	// +optional
 	// +kubebuilder:default=true
 	IncludeMetadata bool `json:"includeMetadata"`
@@ -272,6 +274,7 @@ type OutputConfiguration struct {
 	// +optional
 	PersistentVolumeClaim *string `json:"persistentVolumeClaim,omitempty"`
 	// BlobUpload is a secret containing the blob SAS URL to the given blob container.
+	// The URL must use https.
 	// +optional
 	BlobUpload *string `json:"blobUpload,omitempty"`
 	// S3Upload configures the details for uploading capture files to an S3-compatible storage service.
@@ -280,7 +283,8 @@ type OutputConfiguration struct {
 }
 
 type S3Upload struct {
-	// Endpoint of S3 compatible storage service.
+	// Endpoint of S3 compatible storage service. Must use https when set; when empty, the endpoint
+	// for the region is used.
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 	// Bucket in which to store the capture.
