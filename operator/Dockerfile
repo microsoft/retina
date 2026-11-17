@@ -44,7 +44,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # retina-operator binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261105@sha256:bc4d9a4e0d3317999e235cb5895dde28bf766d25533ae8e6ba311bd6d253f996
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261116@sha256:acf5853dc3651b91bdbf3aee1e5383e689452f6637bd9bf74c9537771cafa6c2
 WORKDIR /
 COPY --from=builder /lib /lib
 COPY --from=builder /usr/lib/ /usr/lib
