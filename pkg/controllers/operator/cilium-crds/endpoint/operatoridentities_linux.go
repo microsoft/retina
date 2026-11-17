@@ -26,8 +26,13 @@ const (
 	ciliumConfigLabelPrefixFile        = option.LabelPrefixFile
 )
 
-var ErrIdentityModeNotOperator = errors.New("--" + ReuseOperatorIdentities + " requires " +
-	ciliumConfigIdentityManagementMode + "=" + option.IdentityManagementModeOperator + " in " + ciliumConfigNamespace + "/" + ciliumConfigName)
+var (
+	ErrIdentityModeNotOperator = errors.New("--" + ReuseOperatorIdentities + " requires " +
+		ciliumConfigIdentityManagementMode + "=" + option.IdentityManagementModeOperator + " in " + ciliumConfigNamespace + "/" + ciliumConfigName)
+	ErrLabelPrefixFileUnsupported = errors.New(ciliumConfigLabelPrefixFile + " in " + ciliumConfigNamespace + "/" + ciliumConfigName +
+		" is not supported with --" + ReuseOperatorIdentities + ": identity labels would not match cilium-operator's")
+	ErrInvalidLabelPrefixCfg = errors.New("invalid " + ciliumConfigLabels + " in " + ciliumConfigNamespace + "/" + ciliumConfigName)
+)
 
 // setupOperatorIdentities makes identity labels match the CiliumIdentities created by cilium-operator.
 // It configures the process-global label filter and cluster name from cilium-config, so it must run before any worker.
@@ -36,7 +41,9 @@ func (r *endpointReconciler) setupOperatorIdentities(ctx context.Context) error 
 		return errors.Wrap(ErrClientsetDisabled, "kubernetes client is required to read "+ciliumConfigName)
 	}
 
-	cm, err := r.k8sClient.CoreV1().ConfigMaps(ciliumConfigNamespace).Get(ctx, ciliumConfigName, metav1.GetOptions{})
+	getCtx, cancel := context.WithTimeout(ctx, RequestTimeout)
+	defer cancel()
+	cm, err := r.k8sClient.CoreV1().ConfigMaps(ciliumConfigNamespace).Get(getCtx, ciliumConfigName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to read "+ciliumConfigNamespace+"/"+ciliumConfigName)
 	}
@@ -46,13 +53,13 @@ func (r *endpointReconciler) setupOperatorIdentities(ctx context.Context) error 
 	}
 
 	if file := cm.Data[ciliumConfigLabelPrefixFile]; file != "" {
-		r.l.Warn(ciliumConfigLabelPrefixFile+" is not supported; identity labels may not match cilium-operator's", "labelPrefixFile", file)
+		return errors.Wrapf(ErrLabelPrefixFileUnsupported, "got %q", file)
 	}
 
 	// cilium reads the labels option with viper.GetStringSlice, which splits a string value on whitespace.
 	prefixes := strings.Fields(cm.Data[ciliumConfigLabels])
 	if err := labelsfilter.ParseLabelPrefixCfg(r.l, prefixes, nil, ""); err != nil {
-		return errors.Wrap(err, "failed to parse "+ciliumConfigLabels+" from "+ciliumConfigName)
+		return errors.Wrapf(ErrInvalidLabelPrefixCfg, "%q: %v", cm.Data[ciliumConfigLabels], err)
 	}
 
 	// GetPodMetadata adds option.Config.ClusterName as the io.cilium.k8s.policy.cluster label.

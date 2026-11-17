@@ -2,6 +2,7 @@ package endpointcontroller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
+	"github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
+	ciliumv2client "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/testutils"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	v1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
@@ -547,6 +550,127 @@ func TestNamespaceUpdate(t *testing.T) {
 	}
 	t.Logf("%+v", cep.Status.Identity.Labels)
 	require.Equal(t, expectedCEP, cep)
+}
+
+var errInjectedPatch = errors.New("injected patch failure")
+
+// failingPatchClient fails the next N CiliumEndpoint patches for the named endpoint.
+type failingPatchClient struct {
+	versioned.Interface
+	failName  string
+	failCount int
+}
+
+func (c *failingPatchClient) CiliumV2() ciliumv2client.CiliumV2Interface {
+	return &failingPatchCiliumV2{CiliumV2Interface: c.Interface.CiliumV2(), parent: c}
+}
+
+type failingPatchCiliumV2 struct {
+	ciliumv2client.CiliumV2Interface
+	parent *failingPatchClient
+}
+
+func (c *failingPatchCiliumV2) CiliumEndpoints(namespace string) ciliumv2client.CiliumEndpointInterface {
+	return &failingPatchEndpoints{CiliumEndpointInterface: c.CiliumV2Interface.CiliumEndpoints(namespace), parent: c.parent}
+}
+
+type failingPatchEndpoints struct {
+	ciliumv2client.CiliumEndpointInterface
+	parent *failingPatchClient
+}
+
+func (c *failingPatchEndpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*ciliumv2.CiliumEndpoint, error) {
+	if name == c.parent.failName && c.parent.failCount > 0 {
+		c.parent.failCount--
+		return nil, errInjectedPatch
+	}
+	//nolint:wrapcheck // pass through mock errors
+	return c.CiliumEndpointInterface.Patch(ctx, name, pt, data, opts, subresources...)
+}
+
+func TestNamespaceUpdateRetriesFailedPods(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	podKeyX, podX := podTestX()
+	podKeyY, podY := podTestX()
+	podKeyY.Name = "y"
+	podY.Name = "y"
+	podY.UID = "222"
+	podY.Status.PodIP = "1.2.3.5"
+	podKeyZ, podZ := podTestX()
+	podKeyZ.Name = "z"
+	podZ.Name = "z"
+	podZ.UID = "333"
+	podZ.Status.PodIP = "1.2.3.6"
+
+	require.NoError(t, r.reconcileNamespace(context.TODO(), &v1.Namespace{
+		ObjectMeta: slim_metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+	}))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyX, podX))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyY, podY))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyZ, podZ))
+
+	r.clientset = &failingPatchClient{Interface: r.clientset, failName: "y", failCount: 1}
+
+	ns := &v1.Namespace{
+		ObjectMeta: slim_metav1.ObjectMeta{
+			Name:            "test",
+			Labels:          map[string]string{"k1": "v1"},
+			ResourceVersion: "2",
+		},
+	}
+	nsLabel := "k8s:io.cilium.k8s.namespace.labels.k1=v1"
+
+	err := r.reconcileNamespace(context.TODO(), ns)
+	require.ErrorIs(t, err, errInjectedPatch)
+
+	// the old namespace is restored so the retry is not skipped
+	cachedNs, ok := r.store.GetNamespace("test")
+	require.True(t, ok)
+	require.Equal(t, "1", cachedNs.GetResourceVersion())
+
+	// pods other than the failed one are still updated
+	require.Contains(t, getAndAssertCEPExists(t, ciliumEndpoints, podX).Status.Identity.Labels, nsLabel)
+	require.NotContains(t, getAndAssertCEPExists(t, ciliumEndpoints, podY).Status.Identity.Labels, nsLabel)
+	require.Contains(t, getAndAssertCEPExists(t, ciliumEndpoints, podZ).Status.Identity.Labels, nsLabel)
+
+	// retry with the same namespace object
+	require.NoError(t, r.reconcileNamespace(context.TODO(), ns))
+	cachedNs, ok = r.store.GetNamespace("test")
+	require.True(t, ok)
+	require.Equal(t, "2", cachedNs.GetResourceVersion())
+
+	for _, pod := range []*v1.Pod{podX, podY, podZ} {
+		cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+		require.Contains(t, cep.Status.Identity.Labels, nsLabel, "pod %s", pod.Name)
+	}
+}
+
+func TestPatchIdentityIDChangedWithEqualLabels(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	podKey, pod := podTestX()
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+	expectedID := cep.Status.Identity.ID
+	require.NotZero(t, expectedID)
+
+	// simulate an operator restart with a CEP carrying a stale identity ID for the same labels
+	staleCEP := cep.DeepCopy()
+	staleCEP.Status.Identity.ID = expectedID + 1000
+	ciliumEndpoints.Upsert(staleCEP)
+	r.store.DeletePod(podKey)
+
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	cep = getAndAssertCEPExists(t, ciliumEndpoints, pod)
+	require.Equal(t, expectedID, cep.Status.Identity.ID)
+	require.Equal(t, staleCEP.Status.Identity.Labels, cep.Status.Identity.Labels)
+
+	pep, ok := r.store.GetPod(podKey)
+	require.True(t, ok)
+	require.Equal(t, expectedID, pep.identityID)
 }
 
 func TestUpdateFailurePodLabelsChanged(_ *testing.T) {

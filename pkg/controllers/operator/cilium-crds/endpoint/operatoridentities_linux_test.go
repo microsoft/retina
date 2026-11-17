@@ -6,6 +6,7 @@ package endpointcontroller
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/cilium/cilium/pkg/labels"
 	"github.com/cilium/cilium/pkg/labelsfilter"
 	"github.com/cilium/cilium/pkg/option"
+	ciliumutil "github.com/microsoft/retina/pkg/utils/testutil/cilium"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,6 +121,24 @@ func TestReuseOperatorIdentitiesOffKeepsLabels(t *testing.T) {
 	}
 }
 
+func shortenSetupBackoff(t *testing.T) {
+	t.Helper()
+	prevInitial, prevMax := operatorIdentitiesSetupInitialBackoff, operatorIdentitiesSetupMaxBackoff
+	operatorIdentitiesSetupInitialBackoff, operatorIdentitiesSetupMaxBackoff = time.Millisecond, 5*time.Millisecond
+	t.Cleanup(func() {
+		operatorIdentitiesSetupInitialBackoff, operatorIdentitiesSetupMaxBackoff = prevInitial, prevMax
+	})
+}
+
+func waitSetupDone(t *testing.T, r *endpointReconciler) {
+	t.Helper()
+	select {
+	case <-r.setupDone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("operator identities setup did not finish")
+	}
+}
+
 func createCiliumConfig(t *testing.T, r *endpointReconciler, data map[string]string) {
 	t.Helper()
 	_, err := r.k8sClient.CoreV1().ConfigMaps(ciliumConfigNamespace).Create(context.TODO(), &corev1.ConfigMap{
@@ -135,24 +155,95 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		require.Error(t, r.setupOperatorIdentities(context.TODO()))
 	})
 
-	t.Run("identity-management-mode not operator", func(t *testing.T) {
-		r, _ := newTestEndpointReconciler(t)
-		r.cfg = Config{ReuseOperatorIdentities: true}
-		createCiliumConfig(t, r, map[string]string{ciliumConfigIdentityManagementMode: "agent"})
-		require.ErrorIs(t, r.setupOperatorIdentities(context.TODO()), ErrIdentityModeNotOperator)
-	})
+	invalid := []struct {
+		name    string
+		data    map[string]string
+		wantErr error
+	}{
+		{
+			name:    "identity-management-mode not operator",
+			data:    map[string]string{ciliumConfigIdentityManagementMode: "agent"},
+			wantErr: ErrIdentityModeNotOperator,
+		},
+		{
+			name: "label-prefix-file rejected",
+			data: map[string]string{
+				ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
+				ciliumConfigLabelPrefixFile:        "/etc/cilium/labels.json",
+			},
+			wantErr: ErrLabelPrefixFileUnsupported,
+		},
+		{
+			name: "invalid labels",
+			data: map[string]string{
+				ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
+				ciliumConfigLabels:                 "k8s:app k8s:[",
+			},
+			wantErr: ErrInvalidLabelPrefixCfg,
+		},
+	}
+	for _, tt := range invalid {
+		t.Run(tt.name, func(t *testing.T) {
+			useDefaultLabelFilter(t)
+			setClusterName(t, "")
+			r, _ := newTestEndpointReconciler(t)
+			r.cfg = Config{ReuseOperatorIdentities: true}
+			createCiliumConfig(t, r, tt.data)
+			require.ErrorIs(t, r.setupOperatorIdentities(context.TODO()), tt.wantErr)
+			require.Empty(t, option.Config.ClusterName, "nothing is changed on error")
+		})
+	}
 
-	t.Run("invalid labels", func(t *testing.T) {
-		useDefaultLabelFilter(t)
-		setClusterName(t, "")
+	t.Run("invalid cilium-config degrades instead of failing Start", func(t *testing.T) {
+		shortenSetupBackoff(t)
 		r, _ := newTestEndpointReconciler(t)
+		r.identityManager = nil
 		r.cfg = Config{ReuseOperatorIdentities: true}
 		createCiliumConfig(t, r, map[string]string{
 			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-			ciliumConfigLabels:                 "k8s:app k8s:[",
+			ciliumConfigLabelPrefixFile:        "/etc/cilium/labels.json",
 		})
-		require.Error(t, r.setupOperatorIdentities(context.TODO()))
-		require.Empty(t, option.Config.ClusterName, "nothing is changed on error")
+
+		require.NoError(t, r.Start(context.TODO()))
+		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-r.setupDone:
+			t.Fatal("setup must keep retrying while cilium-config is invalid")
+		default:
+		}
+
+		require.NoError(t, r.Stop(context.TODO()))
+		waitSetupDone(t, r)
+		require.Nil(t, r.identityManager, "no controllers may start")
+	})
+
+	t.Run("recovers once cilium-config becomes valid", func(t *testing.T) {
+		shortenSetupBackoff(t)
+		useDefaultLabelFilter(t)
+		setClusterName(t, "")
+		r, _ := newTestEndpointReconciler(t)
+		r.identityManager = nil
+		r.cfg = Config{ReuseOperatorIdentities: true}
+		l := slog.Default()
+		r.pods = ciliumutil.NewMockResource[*v1.Pod](l)
+		r.namespaces = ciliumutil.NewMockResource[*v1.Namespace](l)
+
+		require.NoError(t, r.Start(context.TODO()))
+		t.Cleanup(func() { _ = r.Stop(context.TODO()) })
+		time.Sleep(20 * time.Millisecond)
+		createCiliumConfig(t, r, map[string]string{
+			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
+			ciliumConfigClusterName:            "aks-prod",
+		})
+
+		waitSetupDone(t, r)
+		require.NotNil(t, r.identityManager)
+		require.Equal(t, "aks-prod", option.Config.ClusterName)
+	})
+
+	t.Run("Stop before Start", func(t *testing.T) {
+		r := &endpointReconciler{}
+		require.NotPanics(t, func() { require.NoError(t, r.Stop(context.TODO())) })
 	})
 
 	t.Run("sets cluster name and label filter", func(t *testing.T) {
@@ -198,12 +289,12 @@ func TestOperatorManagedIdentityManagerOnlyLooksUp(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(21279), id)
 
-	// No identity exists for these labels and cilium-operator is not running: lookup times out without creating one.
-	ctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	defer cancel()
-	_, err = im.GetIdentityAndIncrementReference(ctx,
+	// No identity exists for these labels and cilium-operator is not running: lookup fails fast without creating one.
+	start := time.Now()
+	_, err = im.GetIdentityAndIncrementReference(context.TODO(),
 		labels.Map2Labels(map[string]string{testAppKey: testOtherApp, testNamespaceLabel: testNamespace}, labels.LabelSourceK8s))
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrIdentityNotFound)
+	require.Less(t, time.Since(start), 2*time.Second, "lookup must not block waiting for cilium-operator")
 
 	list, err := cids.List(context.TODO(), metav1.ListOptions{})
 	require.NoError(t, err)
@@ -213,4 +304,66 @@ func TestOperatorManagedIdentityManagerOnlyLooksUp(t *testing.T) {
 	require.Empty(t, im.labelIdentities)
 	_, err = cids.Get(context.TODO(), "21279", metav1.GetOptions{})
 	require.NoError(t, err)
+}
+
+func TestOperatorManagedIdentityReconcileAfterIdentityCreated(t *testing.T) {
+	useDefaultLabelFilter(t)
+	setClusterName(t, "default")
+
+	l := slog.Default()
+	ciliumEndpoints := ciliumutil.NewMockResource[*ciliumv2.CiliumEndpoint](l)
+	fakeClientSet, _ := ciliumclient.NewFakeClientset(l)
+	r := &endpointReconciler{
+		l:                   l,
+		clientset:           ciliumutil.NewMockVersionedClient(l, ciliumEndpoints),
+		ciliumEndpoints:     ciliumEndpoints,
+		ciliumSlimClientSet: fakeClientSet.SlimFakeClientset,
+		k8sClient:           fakeClientSet,
+		store:               NewStore(),
+		Mutex:               &sync.Mutex{},
+		windowsNodes:        make(map[string]bool),
+		cfg:                 Config{WindowsOnlyEndpoints: true},
+	}
+	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
+	im, err := NewIdentityManager(context.TODO(), l, fakeClientSet.CiliumFakeClientset, true)
+	require.NoError(t, err)
+	r.identityManager = im
+
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
+	podKey, pod := podTestX()
+	pod.Spec.NodeName = "win-node"
+
+	cids := fakeClientSet.CiliumFakeClientset.CiliumV2().CiliumIdentities()
+	countIdentities := func() int {
+		list, listErr := cids.List(context.TODO(), metav1.ListOptions{})
+		require.NoError(t, listErr)
+		return len(list.Items)
+	}
+
+	err = r.ReconcilePod(context.TODO(), podKey, pod)
+	require.ErrorIs(t, err, ErrIdentityNotFound)
+	assertCEPDoesNotExist(t, ciliumEndpoints, podKey)
+	require.Equal(t, 0, countIdentities())
+
+	podLabels, err := r.ciliumEndpointsLabels(context.TODO(), pod)
+	require.NoError(t, err)
+	securityLabels := make(map[string]string, len(podLabels))
+	for _, lbl := range podLabels {
+		securityLabels[lbl.Source+":"+lbl.Key] = lbl.Value
+	}
+	_, err = cids.Create(context.TODO(), &ciliumv2.CiliumIdentity{
+		ObjectMeta:     metav1.ObjectMeta{Name: "12345"},
+		SecurityLabels: securityLabels,
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return r.ReconcilePod(context.TODO(), podKey, pod) == nil
+	}, 10*time.Second, 50*time.Millisecond)
+
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+	require.NotNil(t, cep.Status.Identity)
+	require.Equal(t, int64(12345), cep.Status.Identity.ID)
+	require.Equal(t, 1, countIdentities())
 }
