@@ -387,6 +387,8 @@ spec:
                       - IP neighbor status
                       - IPtables rule dumps
                       - Network statistics information
+                      The metadata describes the whole node, so it is only collected for node targets (nodeSelector) and
+                      is skipped for Pod targets (podSelector, podNames).
                     type: boolean
                   tcpdumpFilter:
                     description: |-
@@ -414,8 +416,9 @@ spec:
                   be stored.
                 properties:
                   blobUpload:
-                    description: BlobUpload is a secret containing the blob SAS URL
-                      to the given blob container.
+                    description: |-
+                      BlobUpload is a secret containing the blob SAS URL to the given blob container.
+                      The URL must use https.
                     type: string
                   hostPath:
                     description: |-
@@ -445,7 +448,9 @@ spec:
                         description: Bucket in which to store the capture.
                         type: string
                       endpoint:
-                        description: Endpoint of S3 compatible storage service.
+                        description: |-
+                          Endpoint of S3 compatible storage service. Must use https when set; when empty, the endpoint
+                          for the region is used.
                         type: string
                       path:
                         description: Path specifies the prefix path within the S3
