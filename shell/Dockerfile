@@ -33,7 +33,7 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261105@sha256:bfb630450e9c3d7428d59f25ce6df95ba5634d664d96b06017aa56f87da5ec0e
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880
 
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
