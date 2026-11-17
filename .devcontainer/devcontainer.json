@@ -9,7 +9,7 @@
     // so that the editor lints like CI.
     "ghcr.io/devcontainers/features/go:1.3.4": {
       "version": "1.26.8",
-      "golangciLintVersion": "2.11.4"
+      "golangciLintVersion": "2.14.0"
     },
     // Only kubectl comes from this feature. go-setup installs Helm from
     // go.mod, because the feature's Helm install fails when the download of
