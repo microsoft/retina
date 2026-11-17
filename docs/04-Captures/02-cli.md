@@ -133,7 +133,7 @@ The network traffic will be uploaded to the specified output location.
 
 | Flag                  | Type       | Default  | Description                                                                 | Notes |
 |-----------------------|------------|----------|-----------------------------------------------------------------------------|-------|
-| `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  |       |
+| `blob-upload`         | string     | ""       | Blob SAS URL with write permission to upload capture files.                  | Must use `https`. |
 | `cleanup-after-upload` | bool       | false    | Automatically clean up capture files from the node's host path after successful upload to remote storage (blob, S3, or PVC). Requires a remote storage destination (`--blob-upload`, `--s3-bucket`, or `--pvc`). |       |
 | `debug`               | bool       | false    | When debug is true, a customized retina-agent image, determined by the environment variable RETINA_AGENT_IMAGE, is set. |       |
 | `duration`            | string     | 1m0s     | Maximum duration of the packet capture - in minutes / seconds.              |       |
@@ -143,7 +143,7 @@ The network traffic will be uploaded to the specified output location.
 | `host-path`           | string     | retina   | Subpath name under `--host-path-base-dir` in which the capture files are stored on the node. | Must be a relative subpath; absolute paths and `..` are rejected. |
 | `host-path-base-dir`  | string     | /var/log/retina/captures | Absolute base directory on the node under which `--host-path` is joined. | The CLI creates the capture jobs with your own credentials, so you choose the base directory. When using the operator, the base directory is set by the cluster administrator with the Helm value `capture.hostPathBaseDir` and cannot be changed by the Capture author. |
 | `include-filter`      | string     | ""       | A comma-separated list of IP:Port pairs that are included from capturing network packets. Supported formats are IP:Port, IP, Port, *:Port, IP:* | Only works on Linux. With pod selectors, applies only to the selected Pods' traffic. |
-| `include-metadata`    | bool       | true     | Collect static network metadata into the capture file if true.              |       |
+| `include-metadata`    | bool       | true     | Collect static network metadata into the capture file if true.              | Node captures only; skipped when capturing Pods. |
 | `job-num-limit`       | int        | 0        | The maximum number of jobs which can be created for each capture. The default value 0 indicates no limit. This can be configured by CLI flags for each CLI command, or by a config map consumed by the retina-operator. When creating a job requires job number exceeds this limit, it will fail with prompt like `Error: the number of capture jobs 3 exceeds the limit 2`. |       |
 | `max-size`            | int        | 100      | Maximum size of the capture file in MB. When used with `--file-count`, this becomes the per-file size limit for rotating captures. | Only works on Linux.      |
 | `name`                | string     | retina-capture | A name for the Retina Capture.                                              |       |
@@ -158,7 +158,7 @@ The network traffic will be uploaded to the specified output location.
 | `pvc`                 | string     | ""       | PersistentVolumeClaim under the specified or default namespace to store capture files. |       |
 | `s3-access-key-id`    | string     | ""       | S3 access key id to upload capture files.                                   |       |
 | `s3-bucket`           | string     | ""       | Bucket in which to store capture files.                                      |       |
-| `s3-endpoint`         | string     | ""       | Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint. |       |
+| `s3-endpoint`         | string     | ""       | Endpoint for an S3 compatible storage service. Use this if you are using a custom or private S3 service that requires a specific endpoint. | Must use `https`. |
 | `s3-path`             | string     | retina/captures | Prefix path within the S3 bucket where captures will be stored.              |       |
 | `s3-region`           | string     | ""       | Region where the S3 compatible bucket is located.                            |       |
 | `s3-secret-access-key`| string     | ""       | S3 access secret key to upload capture files.                                |       |
@@ -685,6 +685,8 @@ The tarballs take the following name pattern, `$(capturename)-$(hostname)-$(date
 ```
 
 ### Network metadata
+
+Network metadata describes the whole node, so it's only collected for node captures (`--node-selectors`, `--node-names`). Captures that target Pods (`--pod-selectors`, `--pod-names`) skip it, even with `--include-metadata=true`.
 
 - Linux
   - IP address configuration (ip -d -j addr show)
