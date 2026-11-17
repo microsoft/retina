@@ -6,12 +6,14 @@ package packetparser
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
 	"path"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -173,6 +175,17 @@ func validateRingBufferSize(size uint32) error {
 	return nil
 }
 
+// ringBufWakeupSize returns the size of unread data, in bytes, at which the eBPF program
+// wakes the reader. It is 1/wakeupDivisor of the ring, divided by 2 until it holds
+// maxPendingRecords records or less. The result is a power of 2, as the ring size is.
+func ringBufWakeupSize(ringSize uint32) uint32 {
+	size := ringSize / wakeupDivisor
+	for size > uint32(maxPendingRecords*ringBufRecordSize) {
+		size /= 2
+	}
+	return size
+}
+
 func (p *packetParser) Compile(ctx context.Context) error {
 	// Get the absolute path to this file during runtime.
 	dir, err := absPath()
@@ -219,6 +232,7 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		cflags = append(cflags,
 			"-DUSE_RING_BUFFER",
 			fmt.Sprintf("-DRING_BUFFER_SIZE=%d", p.cfg.PacketParserRingBufferSize),
+			fmt.Sprintf("-DRING_BUFFER_WAKEUP_SIZE=%d", ringBufWakeupSize(p.cfg.PacketParserRingBufferSize)),
 		)
 	}
 
@@ -303,16 +317,16 @@ func (p *packetParser) Init() error {
 			p.l.Error("Error NewReader ringbuf", zap.Error(err))
 			return fmt.Errorf("failed to create ringbuf reader: %w", err)
 		}
-		p.reader = &ringBufReaderWrapper{reader: rb}
+		p.reader = newRingBufReaderWrapper(rb)
 	} else {
 		p.l.Info("Initializing Perf Reader")
 		var pr *perf.Reader
-		pr, err = plugincommon.NewPerfReader(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1)
+		pr, err = plugincommon.NewPerfReaderWithWatermark(p.l, objs.RetinaPacketparserEvents, perCPUBuffer, 1, wakeupDivisor, maxPendingRecords*perfRecordSize)
 		if err != nil {
 			p.l.Error("Error NewReader", zap.Error(err))
 			return fmt.Errorf("failed to create perf reader: %w", err)
 		}
-		p.reader = &perfReaderWrapper{reader: pr}
+		p.reader = newPerfReaderWrapper(pr)
 	}
 
 	p.attachmentMap = &sync.Map{}
@@ -773,9 +787,10 @@ func (p *packetParser) run(ctx context.Context) error {
 		go p.processRecord(ctx, i)
 	}
 	// Start events handler from perf array in kernel (producer).
-	// Don't add it to the wait group because we don't want to wait for it.
-	// The perf reader Read call blocks until there is data available in the perf buffer.
-	// That call is unblocked when Reader is closed.
+	// The read deadline of the reader makes each Read call return in one flush interval,
+	// so the handler stops when the context is done. Wait for it: after it stops, Stop can
+	// close the records channel.
+	p.wg.Add(1)
 	go p.handleEvents(ctx)
 
 	// Report kernel-side event drops (buffer write failures) from the eBPF metrics map.
@@ -789,7 +804,7 @@ func (p *packetParser) run(ctx context.Context) error {
 	p.l.Info("Started packet parser")
 
 	// Wait for the context to be done.
-	// This will block till all consumers exit.
+	// This will block till the producer and all consumers exit.
 	p.wg.Wait()
 	p.l.Info("All workers have stopped")
 
@@ -921,6 +936,7 @@ func (p *packetParser) processRecord(ctx context.Context, id int) {
 }
 
 func (p *packetParser) handleEvents(ctx context.Context) {
+	defer p.wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
@@ -938,6 +954,11 @@ func (p *packetParser) readData() {
 	// This is unblocked by the close call.
 	record, err := p.reader.Read()
 	if err != nil {
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			// The flush interval expired and the buffer has no more records.
+			p.flushBatch()
+			return
+		}
 		if errors.Is(err, perf.ErrClosed) || errors.Is(err, ringbuf.ErrClosed) {
 			p.l.Error("Perf array is empty")
 			// nothing to do, we're done
@@ -953,13 +974,45 @@ func (p *packetParser) readData() {
 		return
 	}
 
-	select {
-	case p.recordsChannel <- record:
-	default:
-		// Channel is full, drop the record.
-		// We shouldn't slow down the perf array reader.
-		metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
+	if len(p.batch) == 0 {
+		p.batchStart = time.Now()
 	}
+	p.batch = append(p.batch, record)
+	// Flush a batch that has the maximum size, or that is older than the flush interval.
+	// A reader that does not reach the end of its buffer does not report the end of the
+	// interval, so the age check keeps the delay of a record bounded.
+	if len(p.batch) >= maxPendingRecords || time.Since(p.batchStart) >= eventFlushInterval {
+		p.flushBatch()
+	}
+}
+
+// flushBatch sends the records of one flush interval to the workers in timestamp order.
+// A perf reader returns all records of one CPU, then all records of the next CPU, so the
+// read order of a batch is not the time order.
+func (p *packetParser) flushBatch() {
+	slices.SortStableFunc(p.batch, func(a, b perfRecord) int {
+		return cmp.Compare(recordTime(a), recordTime(b))
+	})
+	for i := range p.batch {
+		select {
+		case p.recordsChannel <- p.batch[i]:
+		default:
+			// Channel is full, drop the record.
+			// We shouldn't slow down the perf array reader.
+			metrics.LostEventsCounter.WithLabelValues(utils.BufferedChannel, name).Inc()
+		}
+	}
+	clear(p.batch)
+	p.batch = p.batch[:0]
+}
+
+// recordTime returns the kernel timestamp of a record. It is the first field of struct packet.
+func recordTime(r perfRecord) uint64 {
+	const size = 8
+	if len(r.RawSample) < size {
+		return 0
+	}
+	return binary.LittleEndian.Uint64(r.RawSample)
 }
 
 // reportLostEvents reports kernel-side event drops (recorded in eBPF because ring
@@ -1047,8 +1100,21 @@ type ringBufReaderWrapper struct {
 	reader *ringbuf.Reader
 }
 
+// newRingBufReaderWrapper starts the first flush interval. The eBPF program wakes the
+// reader only when the unread data crosses RING_BUFFER_WAKEUP_SIZE, so the read
+// deadline is what delivers the events below that size.
+func newRingBufReaderWrapper(reader *ringbuf.Reader) *ringBufReaderWrapper {
+	reader.SetDeadline(time.Now().Add(eventFlushInterval))
+	return &ringBufReaderWrapper{reader: reader}
+}
+
+// Read returns os.ErrDeadlineExceeded one time for each flush interval, after it
+// returned all records that were in the buffer.
 func (r *ringBufReaderWrapper) Read() (perfRecord, error) {
 	rec, err := r.reader.Read()
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		r.reader.SetDeadline(time.Now().Add(eventFlushInterval))
+	}
 	if err != nil {
 		return perfRecord{}, fmt.Errorf("failed to read from ringbuf: %w", err)
 	}
@@ -1069,8 +1135,21 @@ type perfReaderWrapper struct {
 	reader *perf.Reader
 }
 
+// newPerfReaderWrapper starts the first flush interval. The kernel wakes the reader
+// only at the buffer watermark, so the read deadline is what delivers the events
+// below the watermark.
+func newPerfReaderWrapper(reader *perf.Reader) *perfReaderWrapper {
+	reader.SetDeadline(time.Now().Add(eventFlushInterval))
+	return &perfReaderWrapper{reader: reader}
+}
+
+// Read returns os.ErrDeadlineExceeded one time for each flush interval, after it
+// returned all records that were in the buffers.
 func (r *perfReaderWrapper) Read() (perfRecord, error) {
 	rec, err := r.reader.Read()
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		r.reader.SetDeadline(time.Now().Add(eventFlushInterval))
+	}
 	if err != nil {
 		return perfRecord{}, fmt.Errorf("failed to read perf record: %w", err)
 	}

@@ -31,7 +31,7 @@ const (
 	noResponseFromNodeAPIServerDesc               = "Number of packets that did not get a response from node apiserver"
 	apiServerHandshakeLatencyName                 = "adv_node_apiserver_tcp_handshake_latency"
 	apiServerHandshakeLatencyDesc                 = "Latency of node apiserver tcp handshake in ms"
-	TTL                             time.Duration = 500 * time.Millisecond
+	TTL                             time.Duration = 600 * time.Millisecond // 500 ms + the flush interval of the packetparser reader
 	LIMIT                           uint64        = 100000
 	// Histogram bucket parameters (units: milliseconds).
 	// Produces buckets: 0.5, 1.5, 2.5, ..., 63.5, +Inf.

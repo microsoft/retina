@@ -5,6 +5,7 @@ package packetparser
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	v1 "github.com/cilium/cilium/pkg/hubble/api/v1"
@@ -373,6 +375,69 @@ func TestReadData_RingBufClosed(t *testing.T) {
 		reader: mperf,
 	}
 	p.readData()
+}
+
+func TestReadData_SendsBatchInTimestampOrder(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// A perf reader returns the records CPU by CPU, so a later timestamp can come first.
+	recordAt := func(ts uint64) perfRecord {
+		return perfRecord{RawSample: binary.LittleEndian.AppendUint64(nil, ts)}
+	}
+	mperf := newMockPerfReader(ctrl)
+	gomock.InOrder(
+		mperf.EXPECT().Read().Return(recordAt(30), nil),
+		mperf.EXPECT().Read().Return(recordAt(10), nil),
+		mperf.EXPECT().Read().Return(recordAt(20), nil),
+		mperf.EXPECT().Read().Return(perfRecord{}, fmt.Errorf("failed to read perf record: %w", os.ErrDeadlineExceeded)),
+	)
+
+	p := &packetParser{
+		cfg:            cfgPodLevelEnabled,
+		l:              log.Logger().Named("test"),
+		reader:         mperf,
+		recordsChannel: make(chan perfRecord, buffer),
+	}
+	// The fake clock keeps the batch younger than the flush interval.
+	synctest.Test(t, func(t *testing.T) {
+		for range 3 {
+			p.readData()
+		}
+		assert.Empty(t, p.recordsChannel, "records must wait for the end of the flush interval")
+
+		p.readData()
+		require.Len(t, p.recordsChannel, 3)
+		for _, want := range []uint64{10, 20, 30} {
+			assert.Equal(t, want, recordTime(<-p.recordsChannel))
+		}
+	})
+}
+
+func TestReadData_FlushesBatchOlderThanFlushInterval(t *testing.T) {
+	log.SetupZapLogger(log.GetDefaultLogOpts()) //nolint:errcheck // ignore
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// A reader that always has records never reports the end of a flush interval.
+	mperf := newMockPerfReader(ctrl)
+	mperf.EXPECT().Read().Return(perfRecord{RawSample: binary.LittleEndian.AppendUint64(nil, 1)}, nil).Times(2)
+
+	p := &packetParser{
+		cfg:            cfgPodLevelEnabled,
+		l:              log.Logger().Named("test"),
+		reader:         mperf,
+		recordsChannel: make(chan perfRecord, buffer),
+	}
+	synctest.Test(t, func(t *testing.T) {
+		p.readData()
+		assert.Empty(t, p.recordsChannel)
+
+		time.Sleep(eventFlushInterval)
+		p.readData()
+		assert.Len(t, p.recordsChannel, 2, "a batch older than the flush interval must be sent")
+	})
 }
 
 func TestReadDataPodLevelEnabled(t *testing.T) {
