@@ -101,6 +101,7 @@ var (
 		DataAggregationLevel:     kcfg.High,
 		BypassLookupIPOfInterest: true,
 		EnableConntrackMetrics:   true,
+		ConntrackReportInterval:  60 * time.Second,
 	}
 	cfgRingBufferEnabled = &kcfg.Config{
 		EnablePodLevel:             true,
@@ -433,8 +434,24 @@ func TestReadDataPodLevelEnabled(t *testing.T) {
 	}
 }
 
+// stubConntrackGC replaces the conntrack GC loop, because the unit tests have no
+// pinned conntrack map. It returns the number of start calls and of stop calls.
+func stubConntrackGC(t *testing.T) (started, stopped *int) {
+	t.Helper()
+	orig := startConntrackGC
+	t.Cleanup(func() { startConntrackGC = orig })
+
+	started, stopped = new(int), new(int)
+	startConntrackGC = func(context.Context, *log.ZapLogger, bool) (func(), error) {
+		*started++
+		return func() { *stopped++ }, nil
+	}
+	return started, stopped
+}
+
 func TestStartPodLevelDisabled(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
+	gcStarted, gcStopped := stubConntrackGC(t)
 	p := &packetParser{
 		cfg: cfgPodLevelDisabled,
 		l:   log.Logger().Named("test"),
@@ -442,10 +459,16 @@ func TestStartPodLevelDisabled(t *testing.T) {
 	ctx := context.Background()
 	err := p.Start(ctx)
 	require.NoError(t, err)
+	// The conntrack GC loop runs also when pod level is disabled.
+	require.Equal(t, 1, *gcStarted)
+
+	require.NoError(t, p.Stop())
+	require.Equal(t, 1, *gcStopped)
 }
 
 func TestStartWithDataAggregationLevelLow(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts()) // nolint:errcheck // ignore
+	stubConntrackGC(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -526,6 +549,7 @@ func TestStartWithDataAggregationLevelLow(t *testing.T) {
 
 func TestStartWithDataAggregationLevelHigh(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts()) // nolint:errcheck // ignore
+	stubConntrackGC(t)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -635,6 +659,8 @@ func TestPacketParseGenerate(t *testing.T) {
 			name: "PodLevelEnabled",
 			cfg:  cfgPodLevelEnabled,
 			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
+				"#define ENABLE_CONNTRACK_METRICS 0\n" +
+				"#define CT_REPORT_INTERVAL 0\n" +
 				"#define DATA_AGGREGATION_LEVEL 0\n" +
 				"#define DATA_SAMPLING_RATE 0\n",
 		},
@@ -643,6 +669,7 @@ func TestPacketParseGenerate(t *testing.T) {
 			cfg:  cfgConntrackMetricsEnabled,
 			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 1\n" +
 				"#define ENABLE_CONNTRACK_METRICS 1\n" +
+				"#define CT_REPORT_INTERVAL 60\n" +
 				"#define DATA_AGGREGATION_LEVEL 1\n" +
 				"#define DATA_SAMPLING_RATE 0\n",
 		},
@@ -650,6 +677,8 @@ func TestPacketParseGenerate(t *testing.T) {
 			name: "DataAggregationLevelLow",
 			cfg:  cfgDataAggregationLevelLow,
 			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define ENABLE_CONNTRACK_METRICS 0\n" +
+				"#define CT_REPORT_INTERVAL 0\n" +
 				"#define DATA_AGGREGATION_LEVEL 0\n" +
 				"#define DATA_SAMPLING_RATE 0\n",
 		},
@@ -657,6 +686,8 @@ func TestPacketParseGenerate(t *testing.T) {
 			name: "DataAggregationLevelHigh",
 			cfg:  cfgDataAggregationLevelHigh,
 			expectedContents: "#define BYPASS_LOOKUP_IP_OF_INTEREST 0\n" +
+				"#define ENABLE_CONNTRACK_METRICS 0\n" +
+				"#define CT_REPORT_INTERVAL 0\n" +
 				"#define DATA_AGGREGATION_LEVEL 1\n" +
 				"#define DATA_SAMPLING_RATE 0\n",
 		},

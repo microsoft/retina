@@ -158,6 +158,8 @@ type packetParser struct {
 	reporterWg      sync.WaitGroup
 	externalChannel chan *v1.Event
 	tcxSupported    bool // Whether TCX is supported on this system
+	// stopConntrackGC stops the conntrack GC loop and waits for it to exit.
+	stopConntrackGC func()
 }
 
 func ifaceToKey(iface netlink.LinkAttrs) attachmentKey {
