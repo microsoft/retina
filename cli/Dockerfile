@@ -1,5 +1,5 @@
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:d104fef62900c2ca101f52568f43e0e6b6499b60be324fdd4d2ad5bae4bc3203 AS builder
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:8d9d1bbfb154a92ea4068aa676ae24b215cbfcd0d086876dfb1afe1db2a32219 AS builder
 
 # systemcrypto without cgo — required for arm64 cross-compile from amd64 host.
 # Becomes redundant with Go 1.27+ (auto-selected when CGO_ENABLED=0).
@@ -29,16 +29,21 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656 AS libs
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
-RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS libs
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
+RUN tdnf install -y \
+    krb5-1.21.3-6.azl3 \
+    pcre2-10.48-1.azl3 \
+    popt-1.19-2.azl3 \
+    zlib-1.3.2-2.azl3 \
+    && tdnf clean all
 
 # Target 1: Distroless (secure, minimal)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261022@sha256:c91e907c537ad861cb90bc18aece90479b0754b090afd4eb8722dd15477dc9e8 AS distroless-target
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261116@sha256:acf5853dc3651b91bdbf3aee1e5383e689452f6637bd9bf74c9537771cafa6c2 AS distroless-target
 COPY --from=libs /lib/ /lib
 COPY --from=libs /usr/lib/ /usr/lib
 COPY --from=libs /etc/pki/tls/ /etc/pki/tls/
@@ -50,9 +55,14 @@ COPY --from=builder /workspace/kubectl-retina .
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656 AS shell-target
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
-RUN tdnf install -y pcre2-10.48-1.azl3 && tdnf clean all
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS shell-target
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
+RUN tdnf install -y \
+    krb5-1.21.3-6.azl3 \
+    pcre2-10.48-1.azl3 \
+    popt-1.19-2.azl3 \
+    zlib-1.3.2-2.azl3 \
+    && tdnf clean all
 WORKDIR /
 COPY --from=builder /workspace/kubectl-retina /bin/kubectl-retina
 RUN chmod +x /bin/kubectl-retina

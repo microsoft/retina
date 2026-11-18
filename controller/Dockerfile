@@ -5,13 +5,13 @@
 # host arch (fast). The eBPF .o files, which cannot be cleanly cross-compiled
 # by bpf2go, are produced in the separate `bpf-gen` stage below (which runs
 # at $TARGETPLATFORM — native on same-arch, emulated under QEMU otherwise).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:d104fef62900c2ca101f52568f43e0e6b6499b60be324fdd4d2ad5bae4bc3203 AS golang
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:8d9d1bbfb154a92ea4068aa676ae24b215cbfcd0d086876dfb1afe1db2a32219 AS golang
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656 AS azurelinux-core
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS azurelinux-core
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/distroless/minimal:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261022@sha256:c91e907c537ad861cb90bc18aece90479b0754b090afd4eb8722dd15477dc9e8 AS azurelinux-distroless
+FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261116@sha256:acf5853dc3651b91bdbf3aee1e5383e689452f6637bd9bf74c9537771cafa6c2 AS azurelinux-distroless
 
 # build stages
 
@@ -20,7 +20,7 @@ FROM mcr.microsoft.com/azurelinux/distroless/minimal:3.0.20261022@sha256:c91e907
 # .o files via bpf2go/clang — those require native target-arch execution and
 # cannot be cross-compiled from an amd64 host cleanly. Isolating this work in a
 # small dedicated stage keeps the rest of the build fast at $BUILDPLATFORM.
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:d104fef62900c2ca101f52568f43e0e6b6499b60be324fdd4d2ad5bae4bc3203 AS bpf-gen
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:8d9d1bbfb154a92ea4068aa676ae24b215cbfcd0d086876dfb1afe1db2a32219 AS bpf-gen
 ARG GOOS=linux
 ARG GOARCH=amd64
 ENV GOOS=${GOOS}
@@ -121,16 +121,19 @@ RUN --mount=type=cache,target="/root/.cache/go-build" go build -v -o /go/bin/ret
 
 # tools image
 FROM azurelinux-core AS tools
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     clang \
     bpftool \
     iproute \
     iptables \
+    krb5-1.21.3-6.azl3 \
     pcre2-10.48-1.azl3 \
+    popt-1.19-2.azl3 \
     tcpdump \
     which \
-    ca-certificates
+    ca-certificates \
+    zlib-1.3.2-2.azl3
 RUN mkdir -p /tmp/bin
 RUN arr="clang tcpdump ip ss iptables-legacy iptables-legacy-save iptables-nft iptables-nft-save cp uname" ;\
     for i in $arr; do    \
