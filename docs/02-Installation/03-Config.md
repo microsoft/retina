@@ -78,7 +78,7 @@ Use these settings when all of the following are true:
 
 * Linux nodes run Cilium, and Windows nodes run a different CNI, so the Cilium agent does not create CiliumEndpoints for Windows Pods.
 * cilium-operator manages CiliumIdentities (`identity-management-mode: operator`).
-* You want Windows Pods to have CiliumEndpoints with the same security identities as Linux Pods that have the same labels. Cilium on Linux nodes and Hubble can then map Windows Pod IPs to those identities.
+* You want Windows Pods to have CiliumEndpoints with the same security identities as Linux Pods that have the same identity labels (namespace, Pod labels, and service account). Cilium on Linux nodes and Hubble can then map Windows Pod IPs to those identities.
 
 These settings do not enable network policy enforcement on Windows nodes. Retina only publishes CiliumEndpoints for Windows Pods. Policy is enforced only where Cilium runs, on Linux nodes.
 
@@ -128,13 +128,12 @@ operator:
 
 Pass it to the install command from [Hubble Control Plane](./01-Setup.md#hubble-control-plane) by adding `-f windows-cilium-values.yaml`.
 
-For an existing installation, keep the current release values and chart version:
+For an existing installation, keep the current release values. The installed chart and operator image must be a Retina release that includes these flags. `--reuse-values` keeps the installed `operator.tag`, and the RBAC rules for these flags come from the chart. If the release is older, upgrade the chart and the image tags to a newer release first, as in [Hubble Control Plane](./01-Setup.md#hubble-control-plane). Otherwise, the operator fails to start with an unknown flag error.
 
 1. Get the current operator arguments:
 
     ```shell
-    kubectl get deployment retina-operator -n kube-system \
-        -o jsonpath='{range .spec.template.spec.containers[0].args[*]}{@}{"\n"}{end}'
+    helm get values retina -n kube-system -a -o json | jq -r '.operator.container.args[]'
     ```
 
 2. Create `windows-cilium-values.yaml` with all of those arguments under `operator.container.args`, plus `--windows-only-endpoints=true` and `--reuse-operator-identities=true`.
@@ -177,7 +176,7 @@ To disable the feature, upgrade again without the two flags.
     kubectl get ciliumidentities.cilium.io $ID -o jsonpath='{.security-labels}{"\n"}'
     ```
 
-    The labels must include `k8s:io.kubernetes.pod.namespace` with the Pod's namespace and the Pod's labels, after the `labels` filter is applied. If a Linux Pod in the same namespace has the same labels, its CiliumEndpoint has the same `status.identity.id`.
+    The labels must include the Pod's namespace (`k8s:io.kubernetes.pod.namespace`), service account (`k8s:io.cilium.k8s.policy.serviceaccount`), and labels, after the `labels` filter is applied. If a Linux Pod in the same namespace has the same labels and service account, its CiliumEndpoint has the same `status.identity.id`.
 
 #### Troubleshooting
 
@@ -197,4 +196,4 @@ kubectl logs -n kube-system deploy/retina-operator | grep -E "reuse-operator-ide
 
 If cilium-operator has not created the identity for a Pod yet, the Pod is requeued and retried, and the operator logs `identity not yet created by cilium-operator, requeuing pod`. This message is expected briefly after a Pod starts. If it continues, check that cilium-operator is running and that `identity-management-mode` is `operator`.
 
-If a Windows Pod has no CiliumEndpoint, check that its node has the label `kubernetes.io/os=windows` and that the Pod has an IP address.
+If a Windows Pod has no CiliumEndpoint, check that its node has the label `kubernetes.io/os=windows`, that the Pod has an IP address, and that the Pod does not use `hostNetwork: true`.
