@@ -16,11 +16,14 @@ import (
 	"go.uber.org/zap"
 
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
+	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/log"
 )
 
 type BlobUpload struct {
 	l *log.ZapLogger
+	// clientOptions is nil (the SDK defaults) outside tests.
+	clientOptions *azblob.ClientOptions
 }
 
 var _ Location = &BlobUpload{}
@@ -49,15 +52,20 @@ func (bu *BlobUpload) Output(ctx context.Context, srcFilePath string) error {
 		bu.l.Error("Failed to read blob url", zap.Error(err))
 		return err
 	}
+	return bu.upload(ctx, blobURL, srcFilePath)
+}
 
-	if err = validateBlobSASURL(blobURL); err != nil {
+func (bu *BlobUpload) upload(ctx context.Context, blobURL, srcFilePath string) error {
+	if err := validateBlobSASURL(blobURL); err != nil {
+		err = captureUtils.RedactURLQueriesInError(err)
 		bu.l.Error("Failed to validate blob url", zap.Error(err))
 		return err
 	}
 
 	// TODO: add retry policy
-	azClient, err := azblob.NewClientWithNoCredential(blobURL, nil)
+	azClient, err := azblob.NewClientWithNoCredential(blobURL, bu.clientOptions)
 	if err != nil {
+		err = captureUtils.RedactURLQueriesInError(err)
 		bu.l.Error("Failed to create blob client", zap.String("location", bu.Name()), zap.Error(err))
 		return err
 	}
@@ -78,6 +86,8 @@ func (bu *BlobUpload) Output(ctx context.Context, srcFilePath string) error {
 		// TODO: add metadata
 		&azblob.UploadFileOptions{})
 	if err != nil {
+		// Errors for requests that got no response (DNS, connection, TLS, timeout) include the full URL, SAS token included.
+		err = captureUtils.RedactURLQueriesInError(err)
 		bu.l.Error("Failed to upload file to storage account", zap.String("location", bu.Name()), zap.Error(err))
 		return err
 	}
