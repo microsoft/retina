@@ -30,7 +30,8 @@ func (c *GetAKSKubeConfig) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-	res, err := clientFactory.NewManagedClustersClient().ListClusterUserCredentials(ctx, c.ResourceGroupName, c.ClusterName, nil)
+	// Admin credentials use a client certificate, so no kubelogin exec plugin is needed on Entra ID-enabled clusters.
+	res, err := clientFactory.NewManagedClustersClient().ListClusterAdminCredentials(ctx, c.ResourceGroupName, c.ClusterName, nil)
 	if err != nil {
 		return fmt.Errorf("failed to finish the get managed cluster client request: %w", err)
 	}

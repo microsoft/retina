@@ -1,0 +1,83 @@
+{{- /* dig defaults to true when the key is absent, e.g. on `helm upgrade --reuse-values` from a release that predates this value. */ -}}
+{{- if and .Values.operator.enabled (dig "admissionPolicy" "enabled" true .Values.capture) }}
+{{- if not (semverCompare ">=1.30-0" .Capabilities.KubeVersion.Version) }}
+{{- fail (printf "capture.admissionPolicy.enabled requires Kubernetes >= 1.30 (admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy), but the target cluster is %s. Upgrade the cluster, or set capture.admissionPolicy.enabled=false to install without it (node-wide and cross-namespace Captures are then unrestricted)." .Capabilities.KubeVersion.Version) }}
+{{- end }}
+# The operator never sees who created a Capture, so the authorization check for
+# node-wide (nodeSelector) and cross-namespace (namespaceSelector) targets runs
+# here, at admission, against the requesting user. The permissions are checked
+# at cluster scope, so only a ClusterRoleBinding can grant them.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: "{{ .Values.operator.name }}-capture-target-scope"
+  labels:
+    app.kubernetes.io/component: capture
+    app.kubernetes.io/part-of: operator
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["retina.sh"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["captures"]
+  # The operator's own updates (finalizer handling, setting the managed blob
+  # secret) are not re-authorized: it never creates Captures, and its
+  # ServiceAccount can already create capture Jobs directly.
+  matchConditions:
+    - name: exclude-operator-updates
+      expression: "request.operation == 'CREATE' || request.userInfo.username != 'system:serviceaccount:{{ .Values.namespace }}:{{ .Values.operator.name }}'"
+  variables:
+    - name: target
+      expression: "object.spec.captureConfiguration.captureTarget"
+    # Any spec change is re-authorized, since a Capture without Jobs is
+    # re-translated from its current spec. Metadata-only updates (labels,
+    # finalizers) and status updates are not.
+    - name: specChanged
+      expression: "request.operation == 'CREATE' || oldObject.spec != object.spec"
+  validations:
+    - expression: "!variables.specChanged || !has(variables.target.nodeSelector) || authorizer.group('retina.sh').resource('captures').check('capture-nodes').allowed()"
+      reason: Forbidden
+      message: "captureTarget.nodeSelector captures all traffic on the selected nodes, across every namespace; it requires the cluster-scoped 'capture-nodes' verb on captures.retina.sh (granted through a ClusterRoleBinding)"
+    - expression: "!variables.specChanged || !has(variables.target.namespaceSelector) || authorizer.group('retina.sh').resource('captures').check('capture-namespaces').allowed()"
+      reason: Forbidden
+      message: "captureTarget.namespaceSelector captures Pods outside the Capture's own namespace; it requires the cluster-scoped 'capture-namespaces' verb on captures.retina.sh (granted through a ClusterRoleBinding)"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: "{{ .Values.operator.name }}-capture-target-scope"
+  labels:
+    app.kubernetes.io/component: capture
+    app.kubernetes.io/part-of: operator
+spec:
+  policyName: "{{ .Values.operator.name }}-capture-target-scope"
+  validationActions: ["Deny"]
+---
+# Bind with a ClusterRoleBinding to let a user create node-wide Captures (nodeSelector).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "{{ .Values.operator.name }}-capture-nodes"
+  labels:
+    app.kubernetes.io/component: capture
+    app.kubernetes.io/part-of: operator
+rules:
+  - apiGroups: ["retina.sh"]
+    resources: ["captures"]
+    verbs: ["capture-nodes"]
+---
+# Bind with a ClusterRoleBinding to let a user create cross-namespace Captures (namespaceSelector).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "{{ .Values.operator.name }}-capture-namespaces"
+  labels:
+    app.kubernetes.io/component: capture
+    app.kubernetes.io/part-of: operator
+rules:
+  - apiGroups: ["retina.sh"]
+    resources: ["captures"]
+    verbs: ["capture-namespaces"]
+{{- end }}

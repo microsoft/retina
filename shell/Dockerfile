@@ -2,18 +2,18 @@
 # its standard library tracks the golang base image instead of the upstream
 # release cadence. Upstream publishes binaries only on tags.
 # skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:d104fef62900c2ca101f52568f43e0e6b6499b60be324fdd4d2ad5bae4bc3203 AS pwru-build
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:8d9d1bbfb154a92ea4068aa676ae24b215cbfcd0d086876dfb1afe1db2a32219 AS pwru-build
 RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
 # https://github.com/cilium/pwru/releases/tag/v1.0.12
 ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
 RUN git clone https://github.com/cilium/pwru /pwru && git -C /pwru checkout "$PWRU_COMMIT"
 WORKDIR /pwru
 # pwru's pinned commit still resolves golang.org/x/net v0.57.0, which is
-# affected by CVE-2026-78669. Bump it in pwru's own module before building;
+# affected by CVE-2026-78669 and CVE-2026-78661. Bump it in pwru's own module before building;
 # the retina modules are already on a fixed version via the root go.mod.
 # pwru vendors its dependencies, so the vendor tree must be regenerated to
 # stay consistent with the updated go.mod.
-RUN GOFLAGS=-mod=mod go get golang.org/x/net@v0.60.0 \
+RUN GOFLAGS=-mod=mod go get golang.org/x/net@v0.62.0 \
     && GOFLAGS=-mod=mod go mod vendor
 ARG GOARCH=amd64
 RUN set -eux; \
@@ -33,9 +33,9 @@ RUN set -eux; \
     ./pwru --version
 
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261022@sha256:bd88359666e3f20296e7fe639a480dfd3c3c8eba299b21f26e4560353e21a656
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880
 
-# Keep this pin until the Azure Linux base includes pcre2 >= 10.48-1.azl3; verify both architectures before removing.
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
@@ -49,6 +49,7 @@ RUN tdnf install -y \
 	iptables \
 	iputils \
 	jq \
+	krb5-1.21.3-6.azl3 \
 	ldns-utils \
 	less \
 	nano \
@@ -58,11 +59,13 @@ RUN tdnf install -y \
 	nmap-ncat \
 	openssh \
 	pcre2-10.48-1.azl3 \
+	popt-1.19-2.azl3 \
 	procps-ng \
 	sysstat \
 	socat \
 	tcpdump \
 	wget \
+	zlib-1.3.2-2.azl3 \
 	tar \
 	file \
 	bpftool \
