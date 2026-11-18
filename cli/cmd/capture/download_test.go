@@ -677,6 +677,9 @@ func (failingSender) Send(_ *storage.Client, req *http.Request) (*http.Response,
 	return nil, &url.Error{Op: req.Method, URL: req.URL.String(), Err: errNoSuchHost}
 }
 
+// blobPrefix is the --name used for the blob listing; the listed blob below starts with it.
+const blobPrefix = "capture"
+
 const listBlobsResponse = `<?xml version="1.0" encoding="utf-8"?>
 <EnumerationResults ServiceEndpoint="https://retinatest.blob.core.invalid/" ContainerName="captures">
 <Prefix>capture</Prefix>
@@ -689,8 +692,11 @@ type listingSender struct {
 	getBlob func(*http.Request) (*http.Response, error)
 }
 
+// listComp is the comp query value of a List Blobs request.
+const listComp = "list"
+
 func (s listingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
-	if req.URL.Query().Get("comp") == "list" {
+	if req.URL.Query().Get("comp") == listComp {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Header:     http.Header{"Content-Type": []string{"application/xml"}},
@@ -786,7 +792,7 @@ func TestDownloadFromBlobErrorsDoNotContainSASToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logs := observeLogs(t)
 			originalBlobURL, originalName := blobURL, opts.Name
-			name := "capture"
+			name := blobPrefix
 			blobURL, opts.Name = tt.blobURL, &name
 			t.Cleanup(func() { blobURL, opts.Name = originalBlobURL, originalName })
 			originalOutputPath := outputPath
