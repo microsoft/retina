@@ -1,0 +1,60 @@
+name: Test Pipeline Configuration
+on:
+  merge_group:
+    types: [checks_requested]
+  push:
+    branches: [main]
+    paths:
+      - ".azure-pipelines/**"
+      - ".github/workflows/test-pipelines.yaml"
+      - "test/pipelines/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".azure-pipelines/**"
+      - ".github/workflows/test-pipelines.yaml"
+      - "test/pipelines/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline-tests:
+    name: Pipeline configuration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # GitHub does not support paths filters on merge_group events.
+      - name: Check pipeline changes in merge queue
+        if: github.event_name == 'merge_group'
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          changed_files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
+            .azure-pipelines .github/workflows/test-pipelines.yaml test/pipelines)
+          if [[ -n "$changed_files" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Go
+        if: github.event_name != 'merge_group' || steps.changes.outputs.run == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Run pipeline configuration tests
+        if: github.event_name != 'merge_group' || steps.changes.outputs.run == 'true'
+        run: go test -v -tags=pipeline ./test/pipelines -count=1

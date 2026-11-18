@@ -19,6 +19,24 @@ Unlike the [CLI](./02-cli.md#cluster-access), the CRD flow doesn't require your 
 |---|---|---|
 | `captures.retina.sh` | `create`, `get`, `list`, `delete` | namespace |
 
+This is enough for Captures that target Pods in the Capture's own namespace (`podSelector` or `podNames`). Two targets reach beyond that namespace and need an extra, **cluster-scoped** permission:
+
+| Target | What it captures | Extra verb on `captures.retina.sh` | ClusterRole installed by the chart |
+|---|---|---|---|
+| `captureTarget.nodeSelector` | All traffic on the selected nodes, from every namespace | `capture-nodes` | `retina-operator-capture-nodes` |
+| `captureTarget.namespaceSelector` | Pods in other namespaces | `capture-namespaces` | `retina-operator-capture-namespaces` |
+
+The chart enforces this with a `ValidatingAdmissionPolicy` (Kubernetes 1.30 or later). It checks the verb when a Capture is created, and again whenever the `spec` of a Capture using one of these targets changes (labels, annotations and status updates aren't re-checked). The verb only counts when it's granted cluster-wide, through a `ClusterRoleBinding`; a `RoleBinding` in the Capture's namespace is not enough. Cluster admins (and any role with `verbs: ["*"]` on `captures.retina.sh` cluster-wide) already hold both verbs. To grant node-wide captures to a user:
+
+```shell
+kubectl create clusterrolebinding alice-capture-nodes \
+    --clusterrole=retina-operator-capture-nodes --user=alice
+```
+
+The ClusterRole names use the `operator.name` Helm value as prefix (`retina-operator` by default). To install without the policy, for example on clusters older than 1.30, set `capture.admissionPolicy.enabled=false`; `nodeSelector` and `namespaceSelector` are then not restricted by RBAC.
+
+When rendering the chart offline with `helm template`, pass your cluster's version with `--kube-version` (for example `--kube-version 1.31.0`). Without it, Helm assumes the Kubernetes version it was built against, which is older than 1.30 for Helm 3.14 and earlier, and the policy's version check fails.
+
 ### Cluster Admission Policies
 
 The operator translates each `Capture` into the same underlying Job/Pod spec used by the CLI, so the same elevated Pod settings are required. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:

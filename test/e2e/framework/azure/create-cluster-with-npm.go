@@ -135,7 +135,7 @@ func (c *CreateNPMCluster) Run() error {
 	}
 
 	log.Printf("when the cluster is ready, use the below command to access and debug")
-	log.Printf("az aks get-credentials --resource-group %s --name %s --subscription %s", c.ResourceGroupName, c.ClusterName, c.SubscriptionID)
+	log.Printf("az aks get-credentials --admin --resource-group %s --name %s --subscription %s", c.ResourceGroupName, c.ClusterName, c.SubscriptionID)
 	log.Printf("creating cluster \"%s\" in resource group \"%s\"...", c.ClusterName, c.ResourceGroupName)
 
 	poller, err := clientFactory.NewManagedClustersClient().BeginCreateOrUpdate(ctx, c.ResourceGroupName, c.ClusterName, npmCluster, nil)
