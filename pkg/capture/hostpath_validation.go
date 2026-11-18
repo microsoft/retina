@@ -32,6 +32,8 @@ var (
 	// ErrHostPathInvalidChars is returned when the supplied HostPath contains a
 	// character matched by UnsafePathChars.
 	ErrHostPathInvalidChars = errors.New("hostPath contains characters that are not valid in a path segment")
+	// ErrResolvedHostPathRelative is returned when a resolved on-node path is not absolute.
+	ErrResolvedHostPathRelative = errors.New("resolved hostPath must be an absolute path")
 )
 
 // winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
@@ -48,7 +50,7 @@ var UnsafePathChars = regexp.MustCompile(`[<>:"|?*\x00-\x1f&^%!()]`)
 // ValidateHostPathBaseDir ensures a configured Capture host-path base directory
 // is absolute and free of UnsafePathChars, since it is prefixed onto every
 // resolved HostPath before that value is used as a pod annotation and checked
-// again by the download command's own boundary check; a base dir that passed
+// again at download time by ValidateResolvedHostPath; a base dir that passed
 // only an absolute-path check (e.g. containing '&') would make every later
 // download exploitable or fail. If baseDir is empty, DefaultHostPathBaseDir is
 // used.
@@ -128,6 +130,46 @@ func validateHostPath(raw, baseDir string) (string, error) {
 	}
 
 	return joined, nil
+}
+
+// ValidateResolvedHostPath checks a resolved on-node capture path, such as the
+// value of a capture pod's host-path annotation, and returns it cleaned. Pod
+// annotations can be set by anyone allowed to create Pods, so the value is not
+// trusted. Rules:
+//
+//   - The path must be non-empty, absolute (leading "/") and free of UnsafePathChars.
+//   - The path must not contain any ".." segment, with "/" or "\" as separators
+//     (both are separators on Windows nodes).
+//   - The cleaned path must be baseDir or lie under it.
+//
+// It returns the cleaned base directory and the cleaned path relative to it ("" when p is the base directory itself).
+// If baseDir is empty, DefaultHostPathBaseDir is used.
+func ValidateResolvedHostPath(p, baseDir string) (cleanedBase, relPath string, err error) {
+	if p == "" {
+		return "", "", ErrHostPathEmpty
+	}
+
+	cleanedBase, err = ValidateHostPathBaseDir(baseDir)
+	if err != nil {
+		return "", "", err
+	}
+
+	if UnsafePathChars.MatchString(p) {
+		return "", "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, p)
+	}
+	if !strings.HasPrefix(p, "/") {
+		return "", "", fmt.Errorf("%w: %q", ErrResolvedHostPathRelative, p)
+	}
+	if containsParentSegment(p) {
+		return "", "", fmt.Errorf("%w: %q", ErrHostPathTraversal, p)
+	}
+
+	cleaned := path.Clean(p)
+	if cleanedBase != "/" && cleaned != cleanedBase && !strings.HasPrefix(cleaned, cleanedBase+"/") {
+		return "", "", fmt.Errorf("%w: %q (base %q)", ErrHostPathEscapesBase, p, cleanedBase)
+	}
+
+	return cleanedBase, strings.TrimPrefix(strings.TrimPrefix(cleaned, cleanedBase), "/"), nil
 }
 
 // containsParentSegment returns true if any path segment of p (split on either

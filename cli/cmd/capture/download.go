@@ -71,13 +71,16 @@ const (
 
 // hostPath and fileName come from pod annotations, which are not guaranteed
 // to have gone through Capture-creation-time validation (an attacker with
-// pod-create permission can set them directly), so both are rejected here if
-// they contain any pkgcapture.UnsafePathChars before being used to build a
-// download-helper command. fileName is additionally used as a bare basename
-// (e.g. joined with an output directory or written as a tar entry name), so
-// unlike hostPath it must not contain a path separator at all, or a value
-// like "../../escape" would still traverse out of the intended directory.
-var ErrUnsafeDownloadPath = errors.New("hostPath or file name contains characters that are not allowed")
+// pod-create permission can set them directly), so both are checked here
+// before being used to build a download-helper command or a hostPath volume.
+// hostPath must be an absolute path inside the host path base directory
+// (see pkgcapture.ValidateResolvedHostPath). fileName is additionally used as
+// a bare basename (e.g. joined with an output directory or written as a tar
+// entry name), so it must not contain a path separator at all, or a value like
+// "../../escape" would still traverse out of the intended directory.
+var ErrUnsafeDownloadPath = errors.New("hostPath or file name in the capture pod annotations is not allowed")
+
+var errUnsafeFileName = errors.New("file name must be a single path segment without unsafe characters")
 
 var (
 	blobURL               string
@@ -113,6 +116,8 @@ var (
 
 // DownloadCmd holds all OS-specific commands and configurations
 type DownloadCmd struct {
+	// HostPath is the node directory to mount: the validated host path base directory.
+	HostPath         string
 	ContainerImage   string
 	SrcFilePath      string
 	MountPath        string
@@ -126,6 +131,8 @@ type DownloadService struct {
 	kubeClient kubernetes.Interface
 	config     *rest.Config
 	namespace  string
+	// hostPathBaseDir is the node directory that capture files must be in.
+	hostPathBaseDir string
 }
 
 // Key represents a unique capture identifier
@@ -134,24 +141,41 @@ type Key struct {
 	Namespace string
 }
 
-// NewDownloadService creates a new download service with shared dependencies
-func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, namespace string) *DownloadService {
+// NewDownloadService creates a new download service with shared dependencies. Only capture files under
+// hostPathBaseDir (DefaultHostPathBaseDir when empty) are downloaded.
+func NewDownloadService(kubeClient kubernetes.Interface, config *rest.Config, namespace, hostPathBaseDir string) *DownloadService {
 	return &DownloadService{
-		kubeClient: kubeClient,
-		config:     config,
-		namespace:  namespace,
+		kubeClient:      kubeClient,
+		config:          config,
+		namespace:       namespace,
+		hostPathBaseDir: hostPathBaseDir,
 	}
 }
 
-func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd, error) {
-	if pkgcapture.UnsafePathChars.MatchString(hostPath) ||
-		pkgcapture.UnsafePathChars.MatchString(fileName) ||
-		strings.ContainsAny(fileName, `/\`) {
-		// Only reachable via a pod annotation that bypassed Capture-creation-time
-		// validation, so surface it as a warning for tampering detection.
+func getDownloadCmd(node *corev1.Node, hostPath, fileName, hostPathBaseDir string) (*DownloadCmd, error) {
+	// Only reachable via a pod annotation that bypassed Capture-creation-time
+	// validation (or a --host-path-base-dir that doesn't match the one used at
+	// creation), so surface it as a warning for tampering detection.
+	rejectPath := func(reason error) (*DownloadCmd, error) {
 		retinacmd.Logger.Warn("Rejected unsafe download path from pod annotations",
-			zap.String("node", node.Name), zap.String("hostPath", hostPath), zap.String("fileName", fileName))
-		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q", ErrUnsafeDownloadPath, hostPath, fileName)
+			zap.String("node", node.Name), zap.String("hostPath", hostPath), zap.String("fileName", fileName),
+			zap.String("hostPathBaseDir", hostPathBaseDir), zap.Error(reason))
+		return nil, fmt.Errorf("%w: hostPath=%q fileName=%q: %w", ErrUnsafeDownloadPath, hostPath, fileName, reason)
+	}
+
+	if pkgcapture.UnsafePathChars.MatchString(fileName) || strings.ContainsAny(fileName, `/\`) {
+		return rejectPath(errUnsafeFileName)
+	}
+	// Only the base directory is mounted, read-only, and the file is read through its path relative to it. A path
+	// under the base directory can be a symlink (for example, one created through an earlier download pod), and the
+	// kubelet follows symlinks when it mounts a hostPath; inside the container, a symlink resolves within the
+	// container's own filesystem instead of the node's.
+	baseDir, relPath, err := pkgcapture.ValidateResolvedHostPath(hostPath, hostPathBaseDir)
+	if errors.Is(err, pkgcapture.ErrHostPathEscapesBase) {
+		err = fmt.Errorf("%w (if the capture was created with a different base directory, pass it with --host-path-base-dir)", err)
+	}
+	if err != nil {
+		return rejectPath(err)
 	}
 
 	nodeOS, err := getNodeOS(node)
@@ -165,9 +189,14 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 
 	switch *nodeOS {
 	case WindowsOS:
-		srcFilePath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\") + "\\" + fileName + ".tar.gz"
-		mountPath := "C:\\host" + strings.ReplaceAll(hostPath, "/", "\\")
+		mountPath := "C:\\host" + strings.TrimSuffix(strings.ReplaceAll(baseDir, "/", "\\"), "\\")
+		srcDir := mountPath
+		if relPath != "" {
+			srcDir += "\\" + strings.ReplaceAll(relPath, "/", "\\")
+		}
+		srcFilePath := srcDir + "\\" + fileName + ".tar.gz"
 		return &DownloadCmd{
+			HostPath:         baseDir,
 			ContainerImage:   getWindowsContainerImage(node),
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
@@ -176,9 +205,10 @@ func getDownloadCmd(node *corev1.Node, hostPath, fileName string) (*DownloadCmd,
 			FileReadCommand:  []string{"cmd", "/c", "type", srcFilePath},
 		}, nil
 	case LinuxOS:
-		srcFilePath := "/" + path.Join("host", hostPath, fileName) + ".tar.gz"
-		mountPath := "/" + path.Join("host", hostPath)
+		mountPath := path.Join("/host", baseDir)
+		srcFilePath := path.Join(mountPath, relPath, fileName) + ".tar.gz"
 		return &DownloadCmd{
+			HostPath:         baseDir,
 			ContainerImage:   "mcr.microsoft.com/azurelinux/busybox:1.36",
 			SrcFilePath:      srcFilePath,
 			MountPath:        mountPath,
@@ -259,7 +289,7 @@ func downloadFromCluster(ctx context.Context, config *rest.Config, namespace str
 		return fmt.Errorf("failed to initialize k8s client: %w", err)
 	}
 
-	downloadService := NewDownloadService(kubeClient, config, namespace)
+	downloadService := NewDownloadService(kubeClient, config, namespace, opts.hostPathBaseDir)
 
 	pods, err := getCapturePods(ctx, kubeClient, captureName, namespace)
 	if err != nil {
@@ -322,13 +352,13 @@ func (ds *DownloadService) DownloadFileContent(ctx context.Context, nodeName, ho
 		return nil, errors.Join(ErrGetNodeInfo, err)
 	}
 
-	downloadCmd, err := getDownloadCmd(node, hostPath, fileName)
+	downloadCmd, err := getDownloadCmd(node, hostPath, fileName, ds.hostPathBaseDir)
 	if err != nil {
 		return nil, err
 	}
 
 	fmt.Println("File to be downloaded: ", downloadCmd.SrcFilePath)
-	downloadPod, err := ds.createDownloadPod(ctx, nodeName, hostPath, captureName, downloadCmd)
+	downloadPod, err := ds.createDownloadPod(ctx, nodeName, captureName, downloadCmd)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +414,7 @@ func (ds *DownloadService) executeFileDownload(ctx context.Context, pod *corev1.
 }
 
 // createDownloadPod creates a pod for downloading files from the host
-func (ds *DownloadService) createDownloadPod(ctx context.Context, nodeName, hostPath, captureName string, downloadCmd *DownloadCmd) (*corev1.Pod, error) {
+func (ds *DownloadService) createDownloadPod(ctx context.Context, nodeName, captureName string, downloadCmd *DownloadCmd) (*corev1.Pod, error) {
 	podName := captureName + "-download-" + rand.String(5)
 
 	podSpec := &corev1.Pod{
@@ -404,6 +434,7 @@ func (ds *DownloadService) createDownloadPod(ctx context.Context, nodeName, host
 						{
 							Name:      "host-mount",
 							MountPath: downloadCmd.MountPath,
+							ReadOnly:  true,
 						},
 					},
 				},
@@ -414,7 +445,7 @@ func (ds *DownloadService) createDownloadPod(ctx context.Context, nodeName, host
 					Name: "host-mount",
 					VolumeSource: corev1.VolumeSource{
 						HostPath: &corev1.HostPathVolumeSource{
-							Path: hostPath,
+							Path: downloadCmd.HostPath,
 						},
 					},
 				},
@@ -682,7 +713,7 @@ func createStreamingTarGzArchive(ctx context.Context, outputPath string, capture
 		// Get or create download service for this namespace
 		downloadService, exists := downloadServices[currentNamespace]
 		if !exists {
-			downloadService = NewDownloadService(kubeClient, config, currentNamespace)
+			downloadService = NewDownloadService(kubeClient, config, currentNamespace, opts.hostPathBaseDir)
 			downloadServices[currentNamespace] = downloadService
 		}
 
@@ -823,6 +854,8 @@ func NewDownloadSubCommand() *cobra.Command {
 	downloadCapture.Flags().BoolVar(&downloadAll, "all", false, "Download all available captures for the specified namespace (or all namespaces if --all-namespaces flag is set)")
 	downloadCapture.Flags().BoolVar(&downloadAllNamespaces, "all-namespaces", false, "Download captures from all namespaces (only works with --all flag)")
 	downloadCapture.Flags().StringVarP(&outputPath, "output", "o", DefaultOutputPath, "Path to save the downloaded capture")
+	downloadCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir,
+		"Absolute base directory on the node that capture files are downloaded from. Must match the base directory the capture was created with")
 
 	return downloadCapture
 }
