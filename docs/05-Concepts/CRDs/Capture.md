@@ -49,14 +49,14 @@ The `Capture` CRD is defined with the following specifications:
     - `nodeSelector` and `namespaceSelector` need extra cluster-scoped permissions (`capture-nodes` and `capture-namespaces`) when the chart's admission policy is enabled. See [Capture with CRD - Cluster Access](../../04-Captures/03-crd.md#cluster-access).
     - `podNames` are always looked up in the Capture resource's own namespace.
   - `filters`: Specifies filters for including or excluding network packets based on IP or port. When the target selects Pods, filters further narrow the capture within those Pods' traffic.
-  - `includeMetadata`: Indicates whether networking metadata should be captured.
+  - `includeMetadata`: Indicates whether networking metadata should be captured. The metadata describes the whole node, so it's only collected for node targets (`nodeSelector`) and skipped for Pod targets (`podSelector`, `podNames`).
   - `tcpdumpFilter`: **DEPRECATED and will be removed.** Currently accepts BPF filter expressions only (no flags). Migrate to `captureOption.pcapFilter` for BPF expressions and `captureOption` boolean flags for display/output options (e.g., `noResolveDNS`, `packetBuffered`, `verbosity`).
 
 - **spec.outputConfiguration:** Indicates where the captured data will be stored. It includes the following properties:
-  - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data.
+  - `blobUpload`: Specifies a secret containing the blob SAS URL for storing the capture data. The URL must use `https`.
   - `hostPath`: A relative subpath name (e.g. `my-capture`) joined under the operator-configured host base directory (default `/var/log/retina/captures`) on every node that runs a capture pod. Capture files are written to that joined directory. Absolute paths and `..` segments are rejected.
   - `persistentVolumeClaim`: Mounts a PersistentVolumeClaim into the Pod to store capture files.
-  - `s3Upload`: Specifies the configuration for uploading capture files to an S3-compatible storage service, including the bucket name, region, and optional custom endpoint.
+  - `s3Upload`: Specifies the configuration for uploading capture files to an S3-compatible storage service, including the bucket name, region, and optional custom endpoint (which must use `https`).
 
 - **status:** Describes the status of the capture, including the number of active, failed, and completed jobs, completion time, conditions, and more. Check [capture lifecycle](#capture-lifecycle) for more details.
 

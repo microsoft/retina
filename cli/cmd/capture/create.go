@@ -33,6 +33,7 @@ import (
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
+	"github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	captureLabels "github.com/microsoft/retina/pkg/label"
@@ -162,6 +163,16 @@ func create(kubeClient kubernetes.Interface) error {
 
 	if opts.Namespace == nil || *opts.Namespace == "" {
 		opts.Namespace = &ns
+	}
+
+	// Fail before any secret or Job is created.
+	if opts.blobUpload != "" {
+		if validateErr := outputlocation.ValidateBlobUploadURL(opts.blobUpload); validateErr != nil {
+			return fmt.Errorf("--blob-upload: %w", validateErr)
+		}
+	}
+	if validateErr := outputlocation.ValidateS3Endpoint(opts.s3Endpoint); validateErr != nil {
+		return fmt.Errorf("--s3-endpoint: %w", validateErr)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)

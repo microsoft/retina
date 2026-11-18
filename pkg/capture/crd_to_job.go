@@ -23,6 +23,7 @@ import (
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
+	"github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/label"
@@ -294,6 +295,14 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 			translator.l.Error("Failed to get secrets for Capture", zap.Error(err), zap.String("CaptureName", capture.Name), zap.String("secretName", *capture.Spec.OutputConfiguration.BlobUpload))
 			return err
 		}
+		blobURL, ok := secret.Data[captureConstants.CaptureOutputLocationBlobUploadSecretKey]
+		if !ok {
+			return fmt.Errorf("blob upload secret %s/%s: %w: missing key %q", capture.Namespace, secret.Name,
+				outputlocation.ErrInvalidUploadDestination, captureConstants.CaptureOutputLocationBlobUploadSecretKey)
+		}
+		if validateErr := outputlocation.ValidateBlobUploadURL(string(blobURL)); validateErr != nil {
+			return fmt.Errorf("blob upload secret %s/%s: %w", capture.Namespace, secret.Name, validateErr)
+		}
 
 		secretVolume := corev1.Volume{
 			Name: *capture.Spec.OutputConfiguration.BlobUpload,
@@ -453,10 +462,15 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		return nil, fmt.Errorf("no nodes are selected")
 	}
 	// Without Pod IPs, a Pod target's filter would not be restricted to the Pods and would capture the whole node.
+	podTargets := false
 	for nodeName, target := range *captureTargetOnNode {
 		if !target.CaptureNodeInterface && len(target.PodIpAddresses) == 0 {
 			return nil, fmt.Errorf("%w: node %q", errPodTargetWithoutIPs, nodeName)
 		}
+		podTargets = podTargets || !target.CaptureNodeInterface
+	}
+	if podTargets && envCommon[captureConstants.IncludeMetadataEnvKey] == strconv.FormatBool(true) {
+		translator.l.Info("Network metadata is node-wide and is only collected for node captures; skipping it for Pod targets. Use nodeSelector to collect it.")
 	}
 
 	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
@@ -474,6 +488,11 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		jobEnv := make(map[string]string, len(envCommon))
 		for k, v := range envCommon {
 			jobEnv[k] = v
+		}
+		// Network metadata (routes, iptables, sockets, /proc/net on Linux; the collectlogs.ps1 bundle on Windows)
+		// describes the whole node, not just the target Pods, so it's only collected for node targets.
+		if !target.CaptureNodeInterface {
+			jobEnv[captureConstants.IncludeMetadataEnvKey] = strconv.FormatBool(false)
 		}
 		job := translator.jobTemplate.DeepCopy()
 		captureFilename := &file.CaptureFilename{
@@ -715,6 +734,12 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 
 	if _, err := translator.resolveHostPath(capture.Spec.OutputConfiguration); err != nil {
 		return err
+	}
+
+	if s3Upload := capture.Spec.OutputConfiguration.S3Upload; s3Upload != nil {
+		if err := outputlocation.ValidateS3Endpoint(s3Upload.Endpoint); err != nil {
+			return fmt.Errorf("invalid OutputConfiguration.S3Upload.Endpoint: %w", err)
+		}
 	}
 
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil && *capture.Spec.CaptureConfiguration.TcpdumpFilter != "" &&

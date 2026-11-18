@@ -6,7 +6,6 @@ package outputlocation
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -124,16 +123,5 @@ func readBlobSASURL() (string, error) {
 }
 
 func validateBlobSASURL(blobSASURL string) error {
-	u, err := url.Parse(blobSASURL)
-	if err != nil {
-		return err
-	}
-
-	// Split the path into storage account container and blob
-	path := strings.TrimPrefix(u.Path, "/")
-	if path == "" {
-		return fmt.Errorf("invalid blob SAS URL") //nolint:goerr113 //no specific handling expected
-	}
-
-	return nil
+	return ValidateBlobUploadURL(blobSASURL)
 }
