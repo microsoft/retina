@@ -1,0 +1,21 @@
+# Local development only: no binary signing or CVE-2013-3900 registry hardening.
+# No Windows RUN instructions, so Linux BuildKit can assemble the image.
+ARG OS_VERSION=ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2022 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore:ltsc2022@sha256:b52799a67fa596d4bddcd82ae1dab0077a84767fbc33c7342b72b53ecc71ad09 AS ltsc2022
+# skopeo inspect docker://mcr.microsoft.com/windows/servercore:ltsc2025 --override-os windows --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/windows/servercore:ltsc2025@sha256:4e5730bddf049d5dd9f758a3b4e6875ecf19b5bfeee5068e07aeeb5df9c63c55 AS ltsc2025
+
+FROM ${OS_VERSION} AS agent-win-local
+ARG BINARIES_PATH=output/local/windows_amd64
+LABEL com.azure.containerizationassist.createdby="containerization-assist"
+LABEL io.retina.local-development="unsigned; no CVE-2013-3900 registry hardening; not for production"
+COPY windows/kubeconfigtemplate.yaml /kubeconfigtemplate.yaml
+COPY windows/setkubeconfigpath.ps1 /setkubeconfigpath.ps1
+COPY ${BINARIES_PATH}/captureworkload.exe /captureworkload.exe
+COPY ${BINARIES_PATH}/controller.exe /controller.exe
+ADD https://github.com/microsoft/etl2pcapng/releases/download/v1.10.0/etl2pcapng.exe /etl2pcapng.exe
+# HostProcess networking diagnostics require administrator access.
+USER ContainerAdministrator
+# Kubernetes probes monitor HostProcess health; the image cannot run on Linux.
+CMD ["controller.exe", "start", "--kubeconfig=.\\kubeconfig"]

@@ -90,6 +90,81 @@ make retina-image # also pushes to image registry
 make retina-operator-image
 ```
 
+#### Windows agent images
+
+##### Local development from Linux or WSL
+
+With Docker/Buildx and an existing GHCR login, build and push both Windows Server
+2022 and 2025 development images:
+
+```bash
+make make-win TAG=dev
+
+# Build and push only one Windows version.
+make make-win YEAR=2025 TAG=dev
+
+# Export archives instead of pushing.
+make make-win TAG=dev BUILDX_ACTION=
+```
+
+Tags are `ghcr.io/<owner>/retina/retina-agent:dev-local-windows-ltsc<year>-amd64`.
+Omit `TAG` for the same Git-derived base tag as Linux builds; override
+`IMAGE_NAMESPACE` or `IMAGE_REGISTRY` to change the destination.
+Archives are written to `artifacts/`, one per Windows version. A custom
+`WINDOWS_LOCAL_ARCHIVE` requires selecting a single `YEAR`.
+
+**Development only:** [Dockerfile.local](../../hack/windows/Dockerfile.local)
+packages unsigned binaries without CVE-2013-3900 registry hardening, separately
+from production build outputs. Linux can assemble but cannot run these Windows
+containers; load an archive on a compatible Windows host with
+`docker load --input <archive>`.
+
+##### Native Windows packaging
+
+On a matching Windows Docker host, package prebuilt binaries (signed for
+production) without rebuilding or signing them:
+
+```bash
+make retina-image-win WINDOWS_YEARS=2025 TAG=local \
+  REPO_PATH=. BINARIES_PATH=output/windows_amd64
+```
+
+To cross-compile the binaries separately, run `make build-windows-binaries`;
+the default output is `output/windows_amd64`. Both Windows variants use the same
+binaries, but their production Dockerfiles require native Windows registry commands.
+
+##### Multi-platform manifests
+
+After publishing production-style Windows and Linux images under the same base tag:
+
+```bash
+make manifest-retina-image TAG=<tag> WINDOWS_YEARS="2022 2025"
+```
+
+For an AMD64-only development deployment, build all Linux components and both local
+Windows variants, then publish their shared manifests:
+
+```bash
+export TAG=win25-test
+make retina-image retina-operator-image retina-shell-image \
+  kubectl-retina-image kubectl-retina-shell-image \
+  PLATFORM=linux/amd64 GOARCH=amd64 OUTPUT_LOCAL= BUILDX_ACTION=--push
+make make-win
+for component in retina operator shell kubectl-retina kubectl-retina-shell; do
+  make manifest COMPONENT="$component" LINUX_PLATFORMS=linux/amd64 \
+    WINDOWS_YEARS="2022 2025" WINDOWS_TAG_PREFIX="$TAG-local"
+done
+```
+
+`WINDOWS_TAG_PREFIX="$TAG-local"` selects development Windows images.
+Deploy the shared `$TAG`, not a platform-specific tag; both Windows versions use
+the same Windows DaemonSet. Normal releases also include Linux ARM64 by default.
+
+The agent manifest helper preserves Windows `os.version` metadata: `10.0.20348.*` for
+2022 and `10.0.26100.*` for 2025. Validate image selection, startup, metrics, and
+captures on AKS nodes of both versions; unit and image-build checks do not replace
+runtime validation after containerd updates.
+
 ### Scanning container images
 
 Build and load all five Linux images locally before scanning them:
@@ -247,6 +322,7 @@ Retina has Dockerfiles in multiple directories, and each is tracked separately b
 - `/test/image` - Test images (daily checks)
 - `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
 - `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+- `/hack/windows` - Local Windows images for Server 2022 and 2025 (weekly checks)
 
 When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
 
