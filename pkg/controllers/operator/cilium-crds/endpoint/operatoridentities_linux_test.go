@@ -35,6 +35,7 @@ const (
 	testAppKey            = "app"
 	testOtherApp          = "other"
 	testWebApp            = "web"
+	testClusterName       = "aks-prod"
 )
 
 func useDefaultLabelFilter(t *testing.T) {
@@ -84,7 +85,7 @@ var hashLabels = []string{"pod-template-hash", "controller-revision-hash", "pod-
 
 func TestReuseOperatorIdentitiesKeyParity(t *testing.T) {
 	useDefaultLabelFilter(t)
-	setClusterName(t, "aks-prod")
+	setClusterName(t, testClusterName)
 	r, ns := newOperatorLabelsTestReconciler(t, true)
 
 	for name, pod := range operatorTestPods() {
@@ -102,7 +103,7 @@ func TestReuseOperatorIdentitiesKeyParity(t *testing.T) {
 			for _, h := range hashLabels {
 				require.NotContains(t, lbls, h)
 			}
-			require.Equal(t, "aks-prod", lbls["io.cilium.k8s.policy.cluster"].Value)
+			require.Equal(t, testClusterName, lbls["io.cilium.k8s.policy.cluster"].Value)
 			require.Equal(t, "web-sa", lbls["io.cilium.k8s.policy.serviceaccount"].Value)
 			require.Equal(t, "payments", lbls["io.cilium.k8s.namespace.labels.team"].Value)
 			require.Equal(t, testWebApp, lbls[testAppKey].Value)
@@ -234,12 +235,12 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		createCiliumConfig(t, r, map[string]string{
 			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-			ciliumConfigClusterName:            "aks-prod",
+			ciliumConfigClusterName:            testClusterName,
 		})
 
 		waitSetupDone(t, r)
 		require.NotNil(t, r.identityManager)
-		require.Equal(t, "aks-prod", option.Config.ClusterName)
+		require.Equal(t, testClusterName, option.Config.ClusterName)
 	})
 
 	t.Run("Stop before Start", func(t *testing.T) {
@@ -254,11 +255,11 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		r.cfg = Config{ReuseOperatorIdentities: true}
 		createCiliumConfig(t, r, map[string]string{
 			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-			ciliumConfigClusterName:            "aks-prod",
+			ciliumConfigClusterName:            testClusterName,
 			ciliumConfigLabels:                 "k8s:app  k8s:io.kubernetes.pod.namespace",
 		})
 		require.NoError(t, r.setupOperatorIdentities(context.TODO()))
-		require.Equal(t, "aks-prod", option.Config.ClusterName)
+		require.Equal(t, testClusterName, option.Config.ClusterName)
 
 		identityLabels, _ := labelsfilter.Filter(labels.Map2Labels(map[string]string{
 			testAppKey: testWebApp, "team": "payments", testNamespaceLabel: testNamespace,
@@ -389,7 +390,7 @@ func TestCombinedModeDualStackReusesOperatorIdentity(t *testing.T) {
 	}
 	createCiliumConfig(t, r, map[string]string{
 		ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-		ciliumConfigClusterName:            "aks-prod",
+		ciliumConfigClusterName:            testClusterName,
 	})
 	require.NoError(t, r.setupOperatorIdentities(context.TODO()))
 

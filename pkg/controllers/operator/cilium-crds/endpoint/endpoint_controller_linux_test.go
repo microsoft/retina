@@ -894,8 +894,9 @@ func TestDefaultConfigUnchanged(t *testing.T) {
 }
 
 const (
-	testIPv4 = "10.244.1.57"
-	testIPv6 = "fd00:10:244:1::39"
+	testIPv4      = "10.244.1.57"
+	testIPv6      = "fd00:10:244:1::39"
+	testZonedIPv6 = "fe80::1%eth0"
 )
 
 func withPodIPs(pod *v1.Pod, ips ...string) {
@@ -926,8 +927,8 @@ func TestPodDualStackAddressing(t *testing.T) {
 		{name: "ipv6 canonicalized", podIPs: []string{"FD00:10:244:1:0:0:0:39"}, wantIPv6: testIPv6},
 		{name: "first address per family", podIPs: []string{testIPv4, "10.244.1.58", testIPv6, "fd00::1"}, wantIPv4: testIPv4, wantIPv6: testIPv6},
 		{name: "ipv4-mapped ipv6 is ipv4", podIPs: []string{"::ffff:" + testIPv4, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
-		{name: "zoned ipv6 skipped", podIPs: []string{testIPv4, "fe80::1%eth0", testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
-		{name: "zoned only", podIPs: []string{"fe80::1%eth0"}, noCEP: true},
+		{name: "zoned ipv6 skipped", podIPs: []string{testIPv4, testZonedIPv6, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "zoned only", podIPs: []string{testZonedIPv6}, noCEP: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1038,13 +1039,13 @@ func TestExistingCEPAddressing(t *testing.T) {
 		},
 		{
 			name:           "invalid first pair, valid second pair, unchanged",
-			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: "fe80::1%eth0"}, {IPV4: testIPv4, IPV6: testIPv6}},
+			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: testZonedIPv6}, {IPV4: testIPv4, IPV6: testIPv6}},
 			podIPs:         []string{testIPv4, testIPv6},
 			wantEndpointID: existingEndpointID,
 		},
 		{
 			name:           "no valid address, repaired",
-			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: "fe80::1%eth0"}},
+			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: testZonedIPv6}},
 			podIPs:         []string{testIPv4, testIPv6},
 			wantEndpointID: existingEndpointID + 1,
 		},
