@@ -82,6 +82,9 @@ var ErrUnsafeDownloadPath = errors.New("hostPath or file name in the capture pod
 
 var errUnsafeFileName = errors.New("file name must be a single path segment without unsafe characters")
 
+// blobStorageSender replaces the storage client's sender when set (tests only, to disable retries).
+var blobStorageSender storage.Sender
+
 var (
 	blobURL               string
 	ErrCreateDirectory    = errors.New("failed to create directory")
@@ -543,16 +546,23 @@ func (ds *DownloadService) createDownloadExec(ctx context.Context, pod *corev1.P
 }
 
 func downloadFromBlob() error {
+	// The SAS URL carries a credential, so it's never printed, and errors that may contain it are redacted.
 	u, err := url.Parse(blobURL)
 	if err != nil {
+		err = captureUtils.RedactURLQueriesInError(err)
 		retinacmd.Logger.Error("err: ", zap.Error(err))
-		return fmt.Errorf("failed to parse SAS URL %s: %w", blobURL, err)
+		return fmt.Errorf("failed to parse SAS URL: %w", err)
 	}
 
 	b, err := storage.NewAccountSASClientFromEndpointToken(u.String(), u.Query().Encode())
 	if err != nil {
+		err = captureUtils.RedactURLQueriesInError(err)
 		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return fmt.Errorf("failed to create storage account client: %w", err)
+	}
+
+	if blobStorageSender != nil {
+		b.Sender = blobStorageSender
 	}
 
 	blobService := b.GetBlobService()
@@ -563,6 +573,7 @@ func downloadFromBlob() error {
 	params := storage.ListBlobsParameters{Prefix: *opts.Name}
 	blobList, err := blobService.GetContainerReference(containerName).ListBlobs(params)
 	if err != nil {
+		err = captureUtils.RedactURLQueriesInError(err)
 		retinacmd.Logger.Error("err: ", zap.Error(err))
 		return fmt.Errorf("failed to list blobstore: %w", err)
 	}
@@ -582,6 +593,7 @@ func downloadFromBlob() error {
 		blobRef := blobService.GetContainerReference(containerName).GetBlobReference(blob.Name)
 		readCloser, err := blobRef.Get(&storage.GetBlobOptions{})
 		if err != nil {
+			err = captureUtils.RedactURLQueriesInError(err)
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return fmt.Errorf("failed to read from blobstore: %w", err)
 		}
@@ -589,6 +601,7 @@ func downloadFromBlob() error {
 		blobData, err := io.ReadAll(readCloser)
 		readCloser.Close()
 		if err != nil {
+			err = captureUtils.RedactURLQueriesInError(err)
 			retinacmd.Logger.Error("err: ", zap.Error(err))
 			return fmt.Errorf("failed to obtain blob from blobstore: %w", err)
 		}

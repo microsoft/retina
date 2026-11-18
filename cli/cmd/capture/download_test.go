@@ -7,6 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -796,6 +800,158 @@ func TestGetCapturePods(t *testing.T) {
 			}
 			if !tc.wantErr && len(pods.Items) != tc.expectedCount {
 				t.Errorf("Expected %d pods, got %d", tc.expectedCount, len(pods.Items))
+			}
+		})
+	}
+}
+
+var (
+	errNoSuchHost      = errors.New("dial tcp: no such host")
+	errConnectionReset = errors.New("read: connection reset by peer")
+)
+
+// failingSender fails every request the way http.Client does when no response is received (DNS, connection, TLS,
+// timeout): with a *url.Error that carries the full request URL, SAS token included.
+type failingSender struct{}
+
+func (failingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	return nil, &url.Error{Op: req.Method, URL: req.URL.String(), Err: errNoSuchHost}
+}
+
+// blobPrefix is the --name used for the blob listing; the listed blob below starts with it.
+const blobPrefix = "capture"
+
+const listBlobsResponse = `<?xml version="1.0" encoding="utf-8"?>
+<EnumerationResults ServiceEndpoint="https://retinatest.blob.core.invalid/" ContainerName="captures">
+<Prefix>capture</Prefix>
+<Blobs><Blob><Name>capture-node-1.tar.gz</Name><Properties><Content-Length>4</Content-Length><BlobType>BlockBlob</BlobType></Properties></Blob></Blobs>
+<NextMarker />
+</EnumerationResults>`
+
+// listingSender lists one blob and passes every other request to getBlob.
+type listingSender struct {
+	getBlob func(*http.Request) (*http.Response, error)
+}
+
+// listComp is the comp query value of a List Blobs request.
+const listComp = "list"
+
+func (s listingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	if req.URL.Query().Get("comp") == listComp {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/xml"}},
+			Body:       io.NopCloser(strings.NewReader(listBlobsResponse)),
+			Request:    req,
+		}, nil
+	}
+	return s.getBlob(req)
+}
+
+// failingBody fails reads the way a connection reset mid-body does, with the request URL in the error.
+type failingBody struct {
+	url string
+}
+
+func (b failingBody) Read([]byte) (int, error) {
+	return 0, &url.Error{Op: http.MethodGet, URL: b.url, Err: errConnectionReset}
+}
+
+func (failingBody) Close() error { return nil }
+
+// rejectingSender answers every request the way the storage service rejects an invalid query value: it echoes the
+// value back.
+type rejectingSender struct{}
+
+func (rejectingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Header:     http.Header{"Content-Type": []string{"application/xml"}},
+		Body: io.NopCloser(strings.NewReader(`<Error><Code>InvalidQueryParameterValue</Code><Message>invalid</Message>` +
+			`<QueryParameterName>sig</QueryParameterName><QueryParameterValue>SECRETSIGNATURE</QueryParameterValue></Error>`)),
+		Request: req,
+	}, nil
+}
+
+// The --blob-url SAS token is a credential: it must not appear in errors or logs when the download fails.
+func TestDownloadFromBlobErrorsDoNotContainSASToken(t *testing.T) {
+	const sasURL = "https://retinatest.blob.core.invalid/captures?sv=2022-11-02&sig=SECRETSIGNATURE"
+
+	cases := []struct {
+		name    string
+		blobURL string
+		sender  storage.Sender
+		wantMsg string
+		// The legacy SDK's service errors don't include the request URL.
+		noHostInError bool
+	}{
+		{
+			// No response from a server (e.g. the host doesn't resolve): the error contains the request URL.
+			name:    "listing fails before a response",
+			blobURL: sasURL,
+			sender:  failingSender{},
+			wantMsg: "failed to list blobstore",
+		},
+		{
+			name:    "URL fails to parse",
+			blobURL: "https://retinatest.blob.core.invalid/captures/%zz?sv=2022-11-02&sig=SECRETSIGNATURE",
+			sender:  failingSender{},
+			wantMsg: "failed to parse SAS URL",
+		},
+		{
+			name:          "listing is rejected for a query value",
+			blobURL:       sasURL,
+			sender:        rejectingSender{},
+			wantMsg:       "QueryParameterValue=REDACTED",
+			noHostInError: true,
+		},
+		{
+			name:    "reading the blob fails before a response",
+			blobURL: sasURL,
+			sender: listingSender{getBlob: func(req *http.Request) (*http.Response, error) {
+				return failingSender{}.Send(nil, req)
+			}},
+			wantMsg: "failed to read from blobstore",
+		},
+		{
+			name:    "reading the blob body fails",
+			blobURL: sasURL,
+			sender: listingSender{getBlob: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{},
+					Body:       failingBody{url: req.URL.String()},
+					Request:    req,
+				}, nil
+			}},
+			wantMsg: "failed to obtain blob from blobstore",
+		},
+	}
+
+	for i := range cases {
+		tt := &cases[i]
+		t.Run(tt.name, func(t *testing.T) {
+			logs := observeLogs(t)
+			originalBlobURL, originalName := blobURL, opts.Name
+			name := blobPrefix
+			blobURL, opts.Name = tt.blobURL, &name
+			t.Cleanup(func() { blobURL, opts.Name = originalBlobURL, originalName })
+			originalOutputPath := outputPath
+			outputPath = t.TempDir()
+			t.Cleanup(func() { outputPath = originalOutputPath })
+			blobStorageSender = tt.sender
+			t.Cleanup(func() { blobStorageSender = nil })
+
+			err := downloadFromBlob()
+			require.ErrorContains(t, err, tt.wantMsg)
+			require.NotContains(t, err.Error(), "SECRETSIGNATURE")
+			if !tt.noHostInError {
+				require.Contains(t, err.Error(), "retinatest.blob.core.invalid", "the error should still name the host")
+			}
+
+			require.NotZero(t, logs.Len(), "the failure must still be logged")
+			for _, entry := range logs.All() {
+				require.NotContains(t, fmt.Sprint(entry.Message, entry.ContextMap()), "SECRETSIGNATURE")
 			}
 		})
 	}
