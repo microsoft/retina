@@ -149,7 +149,9 @@ For an existing installation, keep the current release values. The installed cha
         -f windows-cilium-values.yaml
     ```
 
-To disable the feature, upgrade again without the two flags.
+To disable the feature, update `windows-cilium-values.yaml` so it has the full operator argument list without the two flags, and run the same `helm upgrade --reuse-values -f windows-cilium-values.yaml` command. Running `helm upgrade --reuse-values` without the file keeps both flags.
+
+Without these flags, the Retina operator goes back to its default mode. It creates CiliumEndpoints for all Pods, including Linux Pods that Cilium manages, and allocates its own identities instead of reusing cilium-operator identities. This is not a neutral rollback. Don't use the default mode in a cluster where Cilium manages Linux endpoints.
 
 #### Verification
 
