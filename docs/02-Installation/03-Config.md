@@ -67,3 +67,53 @@ Apply to both Agent and Operator.
 * `capture.hostPathBaseDir`: Absolute directory on every node under which Capture CRs may write artifacts. The CR field `outputConfiguration.hostPath` is treated as a relative subpath name and joined under this directory; CR authors cannot influence the base. Defaults to `/var/log/retina/captures` when unset.
 * `capture.admissionPolicy.enabled`: Installs a `ValidatingAdmissionPolicy` that only lets users holding the cluster-scoped `capture-nodes` / `capture-namespaces` verbs on `captures.retina.sh` create Captures that use `captureTarget.nodeSelector` / `captureTarget.namespaceSelector`. Defaults to `true`, applies only when `operator.enabled=true`, and requires Kubernetes 1.30 or later (the install fails on older clusters unless this is set to `false`; with `helm template`, pass `--kube-version`). See [Capture with CRD - Cluster Access](../04-Captures/03-crd.md#cluster-access).
 * `capture.enableManagedStorageAccount`: Enables the use of a managed storage account for storing artifacts.
+
+### Windows Nodes in Cilium Clusters
+
+These operator flags apply to the Hubble control plane chart (`deploy/hubble/manifests/controller/helm/retina`), where the operator runs `manage-cilium-crds`. They are for clusters where Linux nodes run Cilium and Windows nodes run a different CNI, so the Cilium agent does not manage Windows Pods. Both flags are disabled by default, and existing behavior is unchanged unless they are set.
+
+* `--windows-only-endpoints`: The operator creates CiliumEndpoints only for Pods on Windows nodes (node label `kubernetes.io/os=windows`). Pods on other nodes are skipped and left to the Cilium agent. Enable this when Cilium already runs on the Linux nodes, so the operator does not compete with the Cilium agent for Linux Pods.
+* `--reuse-operator-identities`: CiliumEndpoints reference the CiliumIdentities created by cilium-operator instead of identities allocated by the Retina operator. Windows Pods then share a security identity with matching Linux Pods, so Cilium network policies select them consistently, and cilium-operator does not garbage collect the identities they use. Enable this when cilium-operator manages identities.
+
+Enable both flags together for mixed Linux (Cilium) and Windows clusters. The flags are passed as operator arguments. Because Helm replaces lists, set the full argument list, for example in a values file:
+
+```yaml
+operator:
+  container:
+    args:
+      - "manage-cilium-crds"
+      - "--config-dir"
+      - "/retina"
+      - "--windows-only-endpoints=true"
+      - "--reuse-operator-identities=true"
+```
+
+#### Prerequisites for `--reuse-operator-identities`
+
+* Cilium CRDs are installed and cilium-operator is running.
+* `kube-system/cilium-config` sets `identity-management-mode: operator`, so cilium-operator creates CiliumIdentities for Pods.
+* `kube-system/cilium-config` does not set `label-prefix-file`. A label prefix file is not supported, because identity labels would not match cilium-operator's.
+* If `kube-system/cilium-config` sets `labels`, it must be a valid label filter. The operator uses the same `labels` and `cluster-name` values (default `default`) as cilium-operator to compute identity labels.
+* The operator can read `kube-system/cilium-config`. The chart grants `get` on that ConfigMap with the `retina-operator-cilium-config` Role and RoleBinding.
+
+#### Disabled-and-Retry Behavior
+
+The operator does not exit if a prerequisite is missing. Instead, it keeps running, does not manage Windows CiliumEndpoints, and rereads `kube-system/cilium-config` with backoff (starting at 1 second, up to 1 minute) until the configuration is valid. Each new error is logged once at error level:
+
+```text
+failed to set up --reuse-operator-identities; Windows CiliumEndpoints are not managed until kube-system/cilium-config is fixed
+```
+
+The `error` field gives the cause, such as the wrong `identity-management-mode`, a `label-prefix-file` being set, or an invalid `labels` value. After you fix `cilium-config`, the operator recovers automatically without a restart and logs:
+
+```text
+reusing cilium-operator identities
+```
+
+To check the state, search the operator logs:
+
+```shell
+kubectl logs -n kube-system deploy/retina-operator | grep -E "reuse-operator-identities|reusing cilium-operator identities"
+```
+
+If cilium-operator has not created the identity for a Pod yet, the Pod is requeued and retried, and the operator logs `identity not yet created by cilium-operator, requeuing pod`. This message is expected briefly after a Pod starts.
