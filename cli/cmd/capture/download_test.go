@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +37,10 @@ const (
 	testFile     = "test-file"
 	cmdCommand   = "cmd"
 	shellCommand = "sh"
+	// testHostPathBaseDir is the base directory of the "/tmp/captures" host path used by the tests.
+	testHostPathBaseDir = "/tmp"
+	// testCustomBaseDir is a non-default host path base directory.
+	testCustomBaseDir = "/mnt/captures"
 )
 
 func NewLinuxNode(name string) *corev1.Node {
@@ -310,8 +315,8 @@ func TestGetDownloadCmd(t *testing.T) {
 				if !strings.Contains(cmd.SrcFilePath, "/host/tmp/captures/"+testCapture+".tar.gz") {
 					t.Errorf("Expected Linux source file path to match pattern, got %s", cmd.SrcFilePath)
 				}
-				if cmd.MountPath != "/host/tmp/captures" {
-					t.Errorf("Expected Linux mount path '/host/tmp/captures', got %s", cmd.MountPath)
+				if cmd.MountPath != "/host/tmp" {
+					t.Errorf("Expected Linux mount path '/host/tmp', got %s", cmd.MountPath)
 				}
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != shellCommand {
 					t.Errorf("Expected Linux keep alive command to start with 'sh', got %v", cmd.KeepAliveCommand)
@@ -344,8 +349,8 @@ func TestGetDownloadCmd(t *testing.T) {
 				if !strings.Contains(cmd.SrcFilePath, "C:\\host\\tmp\\captures\\"+testCapture+".tar.gz") {
 					t.Errorf("Expected Windows source file path to match pattern, got %s", cmd.SrcFilePath)
 				}
-				if cmd.MountPath != "C:\\host\\tmp\\captures" {
-					t.Errorf("Expected Windows mount path 'C:\\host\\tmp\\captures', got %s", cmd.MountPath)
+				if cmd.MountPath != "C:\\host\\tmp" {
+					t.Errorf("Expected Windows mount path 'C:\\host\\tmp', got %s", cmd.MountPath)
 				}
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows keep alive command to start with 'cmd', got %v", cmd.KeepAliveCommand)
@@ -435,6 +440,42 @@ func TestGetDownloadCmd(t *testing.T) {
 			},
 		},
 		{
+			name:     "hostPath outside the base directory is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "/",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+				require.ErrorIs(t, err, pkgcapture.ErrHostPathEscapesBase)
+				require.Nil(t, cmd)
+			},
+		},
+		{
+			name:     "hostPath with backslash traversal is rejected on Windows node",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: `/tmp/captures\..\..\Windows`,
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+				require.ErrorIs(t, err, pkgcapture.ErrHostPathTraversal)
+				require.Nil(t, cmd)
+			},
+		},
+		{
+			name:     "hostPath is cleaned before use",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp//captures/",
+			fileName: testCapture,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.NoError(t, err)
+				require.Equal(t, testHostPathBaseDir, cmd.HostPath)
+				require.Equal(t, `C:\host\tmp`, cmd.MountPath)
+				require.Equal(t, `C:\host\tmp\captures\`+testCapture+".tar.gz", cmd.SrcFilePath)
+			},
+		},
+		{
 			name: "Unsupported node OS",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "unsupported-test"},
@@ -460,10 +501,110 @@ func TestGetDownloadCmd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
+			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName, testHostPathBaseDir)
 			tc.validate(t, result, err)
 		})
 	}
+}
+
+// The download pod mounts only the host path base directory and reads the capture file through its path relative to
+// it, so a symlink planted under the base directory can't make the kubelet mount another node directory.
+func TestGetDownloadCmdMountsOnlyTheBaseDir(t *testing.T) {
+	const fileName = "cap-node-1"
+	cases := []struct {
+		name          string
+		node          *corev1.Node
+		hostPath      string
+		baseDir       string
+		wantMountPath string
+		wantSrcPath   string
+	}{
+		{
+			name:          "linux, default base",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      pkgcapture.DefaultHostPathBaseDir + "/retina",
+			baseDir:       "",
+			wantMountPath: "/host/var/log/retina/captures",
+			wantSrcPath:   "/host/var/log/retina/captures/retina/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "linux, the base directory itself",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      testCustomBaseDir,
+			baseDir:       testCustomBaseDir,
+			wantMountPath: "/host/mnt/captures",
+			wantSrcPath:   "/host/mnt/captures/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "linux, root base",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      "/a/b",
+			baseDir:       "/",
+			wantMountPath: "/host",
+			wantSrcPath:   "/host/a/b/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "windows, custom base",
+			node:          NewWindowsNode("windows-test"),
+			hostPath:      "/mnt/captures/retina",
+			baseDir:       "/mnt/captures/",
+			wantMountPath: `C:\host\mnt\captures`,
+			wantSrcPath:   `C:\host\mnt\captures\retina\` + fileName + ".tar.gz",
+		},
+		{
+			name:          "windows, root base",
+			node:          NewWindowsNode("windows-test"),
+			hostPath:      "/a/b",
+			baseDir:       "/",
+			wantMountPath: `C:\host`,
+			wantSrcPath:   `C:\host\a\b\` + fileName + ".tar.gz",
+		},
+	}
+
+	for i := range cases {
+		tt := &cases[i]
+		t.Run(tt.name, func(t *testing.T) {
+			wantHostPath, err := pkgcapture.ValidateHostPathBaseDir(tt.baseDir)
+			require.NoError(t, err)
+
+			cmd, err := getDownloadCmd(tt.node, tt.hostPath, fileName, tt.baseDir)
+			require.NoError(t, err)
+			require.Equal(t, wantHostPath, cmd.HostPath)
+			require.Equal(t, tt.wantMountPath, cmd.MountPath)
+			require.Equal(t, tt.wantSrcPath, cmd.SrcFilePath)
+		})
+	}
+}
+
+// A capture created with a custom base directory downloads when the same --host-path-base-dir is passed: its path
+// passes the check and the download pod mounts that base directory, read-only.
+func TestDownloadWithCustomHostPathBaseDir(t *testing.T) {
+	ctx := context.Background()
+	kubeClient := newDownloadKubeClient([]runtime.Object{NewLinuxNode("test-node"), NewDownloadNamespace("test-namespace")})
+
+	cmd := NewDownloadSubCommand()
+	originalBaseDir := opts.hostPathBaseDir
+	t.Cleanup(func() { opts.hostPathBaseDir = originalBaseDir })
+	require.NoError(t, cmd.ParseFlags([]string{"--host-path-base-dir", testCustomBaseDir}))
+
+	// downloadFromCluster and downloadAllCaptures build their DownloadService the same way.
+	service := NewDownloadService(kubeClient, &rest.Config{}, "test-namespace", opts.hostPathBaseDir)
+	node, err := kubeClient.CoreV1().Nodes().Get(ctx, "test-node", metav1.GetOptions{})
+	require.NoError(t, err)
+
+	downloadCmd, err := getDownloadCmd(node, testCustomBaseDir+"/retina", testCapture, service.hostPathBaseDir)
+	require.NoError(t, err)
+	require.Equal(t, "/host/mnt/captures/retina/"+testCapture+".tar.gz", downloadCmd.SrcFilePath)
+
+	pod, err := service.createDownloadPod(ctx, "test-node", testCapture, downloadCmd)
+	require.NoError(t, err)
+	require.Equal(t, testCustomBaseDir, pod.Spec.Volumes[0].HostPath.Path)
+	require.True(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly)
+
+	// Without the flag, the same capture is refused before any pod is created, with a hint to pass it.
+	_, err = getDownloadCmd(node, testCustomBaseDir+"/retina", testCapture, DefaultHostPathBaseDir)
+	require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+	require.ErrorContains(t, err, "--host-path-base-dir")
 }
 
 // TestLinuxFileCheckScriptResistsInjection runs the actual linuxFileCheckScript
@@ -594,7 +735,7 @@ func TestDownloadService(t *testing.T) {
 	config := &rest.Config{}
 	namespace := "test-namespace"
 
-	service := NewDownloadService(kubeClient, config, namespace)
+	service := NewDownloadService(kubeClient, config, namespace, testHostPathBaseDir)
 
 	// Test service creation
 	if service == nil {
@@ -872,16 +1013,17 @@ func TestDownloadServiceMethods(t *testing.T) {
 
 	kubeClient := newDownloadKubeClient(objects)
 	config := &rest.Config{}
-	service := NewDownloadService(kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace", testHostPathBaseDir)
 
 	t.Run("createDownloadPod creates pod correctly", func(t *testing.T) {
 		downloadCmd := &DownloadCmd{
+			HostPath:         testHostPathBaseDir,
 			ContainerImage:   "mcr.microsoft.com/azurelinux/busybox:1.36",
-			MountPath:        "/host/tmp/captures",
+			MountPath:        "/host/tmp",
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
 		}
 
-		pod, err := service.createDownloadPod(ctx, "test-node", "/tmp/captures", testCapture, downloadCmd)
+		pod, err := service.createDownloadPod(ctx, "test-node", testCapture, downloadCmd)
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -889,6 +1031,9 @@ func TestDownloadServiceMethods(t *testing.T) {
 		if pod == nil {
 			t.Fatal("Expected pod to be created, got nil")
 		}
+		require.Len(t, pod.Spec.Volumes, 1)
+		require.Equal(t, testHostPathBaseDir, pod.Spec.Volumes[0].HostPath.Path)
+		require.True(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly, "the node directory must be mounted read-only")
 
 		if pod.Spec.NodeName != "test-node" {
 			t.Errorf("Expected NodeName to be 'test-node', got: %s", pod.Spec.NodeName)
@@ -941,7 +1086,19 @@ func TestDownloadServiceErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	kubeClient := newDownloadKubeClient(nil)
 	config := &rest.Config{}
-	service := NewDownloadService(kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace", testHostPathBaseDir)
+
+	t.Run("DownloadFile rejects a hostPath outside the base directory before creating a pod", func(t *testing.T) {
+		_, err := service.kubeClient.CoreV1().Nodes().Create(ctx, NewLinuxNode("linux-node"), metav1.CreateOptions{})
+		require.NoError(t, err)
+
+		err = service.DownloadFile(ctx, "linux-node", "/", testFile, testCapture)
+		require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+
+		pods, err := service.kubeClient.CoreV1().Pods("test-namespace").List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+		require.Empty(t, pods.Items, "no download pod may be created for a rejected hostPath")
+	})
 
 	t.Run("DownloadFile handles unsupported node OS", func(t *testing.T) {
 		// Create a node with unsupported OS

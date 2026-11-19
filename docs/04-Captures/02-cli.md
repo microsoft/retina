@@ -588,6 +588,7 @@ namespace-2/
 | `--all-namespaces` | Download captures from all namespaces (requires `--all`) | Includes namespace in archive structure |
 | `--blob-url` | Download from Azure Blob Storage using SAS URL | Requires Read/List permissions |
 | `-o, --output` | Specify output directory | Defaults to current directory |
+| `--host-path-base-dir` | Absolute base directory on the node that capture files are downloaded from | Defaults to `/var/log/retina/captures`. Must match the base directory the capture was created with: `--host-path-base-dir` of `capture create`, or the Helm value `capture.hostPathBaseDir` when using the operator. Captures whose files are outside this directory are not downloaded. |
 
 #### Examples
 
