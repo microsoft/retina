@@ -125,6 +125,10 @@ func registerEndpointController(p params) error {
 		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
 		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
 	)
+	if p.Config.ReuseOperatorIdentities && !p.Config.WindowsOnlyEndpoints {
+		l.Warn("--" + ReuseOperatorIdentities + " is set without --" + WindowsOnlyEndpoints +
+			"; CiliumEndpoints are also created for Pods on Linux nodes and compete with the Cilium agent")
+	}
 
 	p.Lifecycle.Append(r)
 

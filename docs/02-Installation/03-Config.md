@@ -89,7 +89,16 @@ The operator flags are:
 * `--windows-only-endpoints`: The operator creates CiliumEndpoints only for Pods on Windows nodes (node label `kubernetes.io/os=windows`). Pods on other nodes are left to the Cilium agent, so the operator does not compete with it.
 * `--reuse-operator-identities`: CiliumEndpoints reference the CiliumIdentities created by cilium-operator instead of identities allocated by the Retina operator. cilium-operator does not garbage collect identities that these endpoints use.
 
-Enable both flags together.
+For hybrid clusters where cilium-operator manages identities, enable both flags together:
+
+| `--windows-only-endpoints` | `--reuse-operator-identities` | Behavior |
+|---|---|---|
+| `false` | `false` | Default. The operator manages CiliumEndpoints and CiliumIdentities for all Pods. Use this when no Cilium agent runs in the cluster. |
+| `true` | `false` | The operator manages CiliumEndpoints only for Pods on Windows nodes and allocates their CiliumIdentities. Use this when cilium-operator does not manage identities. |
+| `true` | `true` | The operator manages CiliumEndpoints only for Pods on Windows nodes and uses the CiliumIdentities created by cilium-operator. |
+| `false` | `true` | Not supported. The operator also creates CiliumEndpoints for Pods on Linux nodes, which competes with the Cilium agent. The operator logs a warning at startup. |
+
+The Retina operator uses the Lease `retina-operator-resource-lock` for leader election, so it can run in the same namespace as cilium-operator.
 
 #### Prerequisites
 
@@ -128,7 +137,7 @@ operator:
 
 Pass it to the install command from [Hubble Control Plane](./01-Setup.md#hubble-control-plane) by adding `-f windows-cilium-values.yaml`.
 
-For an existing installation, keep the current release values. The installed chart and operator image must be a Retina release that includes these flags. `--reuse-values` keeps the installed `operator.tag`, and the RBAC rules for these flags come from the chart. If the release is older, upgrade the chart and the image tags to a newer release first, as in [Hubble Control Plane](./01-Setup.md#hubble-control-plane). Otherwise, the operator fails to start with an unknown flag error.
+For an existing installation, keep the current release values. The installed chart and operator image must be Retina v1.3.4 or later, the first release that includes these flags. `--reuse-values` keeps the installed `operator.tag`, and the RBAC rules for these flags come from the chart. If the release is older, upgrade the chart and the image tags to v1.3.4 or later first, as in [Hubble Control Plane](./01-Setup.md#hubble-control-plane). Otherwise, the operator fails to start with an unknown flag error.
 
 1. Get the current operator arguments:
 
