@@ -28,6 +28,7 @@ rules:
     resources:
       - pods
       - namespaces
+      - nodes
     verbs:
       - get
       - list
@@ -51,6 +52,15 @@ rules:
     - cilium.io
     resources:
     - ciliumnodes
+    verbs:
+    - get
+    - list
+    - watch
+  # for CIDR group labels on Windows Pod identities (--windows-cidr-labels)
+  - apiGroups:
+    - cilium.io
+    resources:
+    - ciliumcidrgroups
     verbs:
     - get
     - list

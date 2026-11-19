@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"net/netip"
 	"reflect"
 	"sync"
 	"time"
@@ -14,10 +15,13 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/operator/cilium-crds/cache"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
+	identitykey "github.com/cilium/cilium/pkg/identity/key"
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -49,6 +53,8 @@ type endpointReconciler struct {
 	l                   *slog.Logger
 	clientset           versioned.Interface
 	ciliumSlimClientSet slim_clientset.Interface
+	// k8sClient reads kube-system/cilium-config when ReuseOperatorIdentities is set.
+	k8sClient kubernetes.Interface
 	// podEvents represents Pod CRUD events relayed from the Pod controller. If the Pod was deleted, the PodCacheObject.Pod field will be nil
 	podEvents chan cache.PodCacheObject
 	// ciliumEndpoints has a store of CiliumEndpoints in API Server
@@ -70,6 +76,16 @@ type endpointReconciler struct {
 	store *Store
 
 	wp *workerpool.WorkerPool
+
+	cfg Config
+	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
+	windowsNodes map[string]bool
+
+	// cidrGroups is watched when WindowsCIDRLabels is set, to add CIDR group labels to Windows Pods.
+	cidrGroups         resource.Resource[*ciliumv2.CiliumCIDRGroup]
+	cidrGroupCache     *cidrGroupCache
+	cidrGroupsSynced   chan struct{}
+	cidrGroupsSyncOnce sync.Once
 }
 
 type params struct {
@@ -80,11 +96,16 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	CIDRGroups      resource.Resource[*ciliumv2.CiliumCIDRGroup]
+	Config          Config
 }
 
 func registerEndpointController(p params) error {
 	if !p.Clientset.IsEnabled() {
 		return ErrClientsetDisabled
+	}
+	if err := p.Config.Validate(); err != nil {
+		return err
 	}
 
 	l := retinalog.SlogLogger().With("component", "endpointcontroller")
@@ -93,11 +114,23 @@ func registerEndpointController(p params) error {
 		l:                   l,
 		clientset:           p.Clientset,
 		ciliumSlimClientSet: p.Clientset.Slim(),
+		k8sClient:           p.Clientset,
 		ciliumEndpoints:     p.CiliumEndpoints,
 		pods:                p.Pods,
 		namespaces:          p.Namespaces,
 		store:               NewStore(),
+		cfg:                 p.Config,
+		windowsNodes:        make(map[string]bool),
+		cidrGroups:          p.CIDRGroups,
+		cidrGroupCache:      newCIDRGroupCache(),
+		cidrGroupsSynced:    make(chan struct{}),
 	}
+
+	l.Info("endpoint controller config",
+		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
+		WindowsCIDRLabels, p.Config.WindowsCIDRLabels,
+		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
+	)
 
 	p.Lifecycle.Append(r)
 
@@ -105,9 +138,16 @@ func registerEndpointController(p params) error {
 }
 
 func (r *endpointReconciler) Start(ctx cell.HookContext) error {
+	if r.cfg.ReuseOperatorIdentities {
+		// Configures process-global label filtering, so it must happen before any worker runs.
+		if err := r.setupOperatorIdentities(ctx); err != nil {
+			return errors.Wrap(err, "failed to set up "+ReuseOperatorIdentities)
+		}
+	}
+
 	// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
 	// There is a way to disable auto-start but then there is no exposed function to simply start().
-	im, err := NewIdentityManager(ctx, r.l, r.clientset)
+	im, err := NewIdentityManager(ctx, r.l, r.clientset, r.cfg.ReuseOperatorIdentities)
 	if err != nil {
 		return errors.Wrap(err, "failed to create identity manager")
 	}
@@ -119,6 +159,12 @@ func (r *endpointReconciler) Start(ctx cell.HookContext) error {
 
 	if err := r.wp.Submit("namespace-controller", r.runNamespaceEvents); err != nil {
 		return errors.Wrap(err, "failed to submit task to namespace workerpool")
+	}
+
+	if r.cidrGroupLabelsEnabled() {
+		if err := r.wp.Submit("cidrgroup-controller", r.runCIDRGroupEvents); err != nil {
+			return errors.Wrap(err, "failed to submit task to cidrgroup workerpool")
+		}
 	}
 
 	if err := r.wp.Submit("endpoint-reconciler", r.run); err != nil {
@@ -139,6 +185,7 @@ func (r *endpointReconciler) Stop(_ cell.HookContext) error {
 func (r *endpointReconciler) run(pctx context.Context) error {
 	r.l.Info("start to reconcile Pods for CiliumEndpoints")
 
+	r.waitForCIDRGroups(pctx)
 	podEvents := r.pods.Events(pctx)
 
 	for {
@@ -293,9 +340,21 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 		return nil
 	}
 
-	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+	ipv4, ipv6 := podAddrs(pod)
+	if (!ipv4.IsValid() && !ipv6.IsValid()) || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
+	}
+
+	if r.cfg.WindowsOnlyEndpoints {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine node OS")
+		}
+		if !isWindows {
+			r.l.Debug("pod is not on a Windows node, skipping", "podKey", podKey.String(), "node", pod.Spec.NodeName)
+			return nil
+		}
 	}
 
 	podLabels, err := r.ciliumEndpointsLabels(ctx, pod)
@@ -305,7 +364,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	newPEP := &PodEndpoint{
 		key:    podKey,
 		lbls:   podLabels,
-		ipv4:   pod.Status.PodIP,
+		ipv4:   addrString(ipv4),
+		ipv6:   addrString(ipv6),
 		nodeIP: pod.Status.HostIP,
 		// TODO: set to false if in follower mode
 		processedAsLeader: true,
@@ -389,10 +449,10 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				"networking", oldCEP.Status.Networking,
 			)
 
-			if oldCEP.Status.Networking == nil || len(oldCEP.Status.Networking.Addressing) == 0 || oldCEP.Status.Networking.Addressing[0].IPV4 == "" {
-				// FIXME handle IPv6 and dual-stack
+			oldIPv4, oldIPv6 := cepAddrs(oldCEP.Status.Networking)
+			if oldIPv4 == "" && oldIPv6 == "" {
 				inStore = false
-				r.l.Warn("CiliumEndpoint has no ipv4 address, ignoring",
+				r.l.Warn("CiliumEndpoint has no IP address, ignoring",
 					"podKey", newPEP.key.String(),
 					"cep", oldCEP,
 				)
@@ -400,13 +460,14 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				oldPEP = &PodEndpoint{
 					key:        newPEP.key,
 					endpointID: oldCEP.Status.ID,
-					ipv4:       oldCEP.Status.Networking.Addressing[0].IPV4,
+					ipv4:       oldIPv4,
+					ipv6:       oldIPv6,
 					nodeIP:     oldCEP.Status.Networking.NodeIP,
 				}
 
 				if oldCEP.Status.Identity != nil {
 					oldPEP.identityID = oldCEP.Status.Identity.ID
-					oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
+					oldPEP.lbls = keyCIDRLabelsLikeCilium(labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels))
 				}
 			}
 		}
@@ -418,7 +479,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		newPEP.endpointID = oldPEP.endpointID
 		newPEP.identityID = oldPEP.identityID
 
-		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.nodeIP == oldPEP.nodeIP
+		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.ipv6 == oldPEP.ipv6 && newPEP.nodeIP == oldPEP.nodeIP
 		equalLabels := newPEP.lbls.Equals(oldPEP.lbls)
 
 		r.l.Debug("patching CiliumEndpoint",
@@ -675,13 +736,151 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
-	lbls := make(labels.Labels, len(ciliumLabels))
-	for k, v := range ciliumLabels {
-		lbls[k] = labels.Label{
-			Key:    k,
-			Value:  v,
-			Source: labels.LabelSourceK8s,
+	var lbls labels.Labels
+	if r.cfg.ReuseOperatorIdentities {
+		// Same key as cilium-operator's CID controller, so the identity it created is found.
+		lbls = identitykey.GetCIDKeyFromLabels(ciliumLabels, labels.LabelSourceK8s).Labels()
+	} else {
+		lbls = make(labels.Labels, len(ciliumLabels)+1)
+		for k, v := range ciliumLabels {
+			lbls[k] = labels.Label{
+				Key:    k,
+				Value:  v,
+				Source: labels.LabelSourceK8s,
+			}
+		}
+	}
+
+	ipv4, ipv6 := podAddrs(pod)
+	addrs := validAddrs(ipv4, ipv6)
+	if r.cfg.WindowsCIDRLabels && len(addrs) > 0 {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine node OS")
+		}
+		if isWindows {
+			// Cilium only matches CIDR selectors against identities carrying cidr: labels.
+			// Without this, giving a Windows Pod an endpoint identity makes it unselectable by CIDR policy.
+			// A dual-stack Pod gets one label per family, like a Cilium prefix identity per address.
+			for _, addr := range addrs {
+				cidrLabel, err := labels.IPStringToLabel(addr.String())
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to build CIDR label")
+				}
+				lbls[cidrLabel.Key] = cidrLabel
+			}
+
+			// cidrGroupRef/cidrGroupSelector rules match cidrgroup: labels, which Cilium only puts on its own prefix identities.
+			if r.cidrGroupLabelsEnabled() {
+				for k, l := range r.cidrGroupCache.labelsFor(addrs...) {
+					// Labels are keyed without source; never let a group label replace a Pod label.
+					if _, exists := lbls[k]; !exists {
+						lbls[k] = l
+					}
+				}
+			}
 		}
 	}
 	return lbls, nil
+}
+
+// isWindowsNode reports whether the node runs Windows, based on the kubernetes.io/os node label.
+// Callers must hold r.Mutex.
+func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string) (bool, error) {
+	if nodeName == "" {
+		return false, nil
+	}
+	if isWindows, ok := r.windowsNodes[nodeName]; ok {
+		return isWindows, nil
+	}
+	node, err := r.ciliumSlimClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get node "+nodeName)
+	}
+	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
+	r.windowsNodes[nodeName] = isWindows
+	return isWindows, nil
+}
+
+// podAddrs returns the Pod's first IPv4 and first IPv6 address from Status.PodIPs,
+// falling back to Status.PodIP. A missing family is returned as the zero netip.Addr.
+func podAddrs(pod *slim_corev1.Pod) (ipv4, ipv6 netip.Addr) {
+	ips := make([]string, 0, len(pod.Status.PodIPs)+1)
+	for _, ip := range pod.Status.PodIPs {
+		ips = append(ips, ip.IP)
+	}
+	if len(ips) == 0 {
+		ips = append(ips, pod.Status.PodIP)
+	}
+	for _, ip := range ips {
+		addr, err := netip.ParseAddr(ip)
+		if err != nil {
+			continue
+		}
+		switch {
+		case addr.Is4() && !ipv4.IsValid():
+			ipv4 = addr
+		case addr.Is6() && !ipv6.IsValid():
+			ipv6 = addr
+		}
+	}
+	return ipv4, ipv6
+}
+
+// validAddrs returns the valid addresses among addrs, in order.
+func validAddrs(addrs ...netip.Addr) []netip.Addr {
+	valid := make([]netip.Addr, 0, len(addrs))
+	for _, a := range addrs {
+		if a.IsValid() {
+			valid = append(valid, a)
+		}
+	}
+	return valid
+}
+
+// addrString returns the address in Cilium's CiliumEndpoint format, or "" for the zero netip.Addr.
+func addrString(addr netip.Addr) string {
+	if !addr.IsValid() {
+		return ""
+	}
+	return addr.String()
+}
+
+// cepAddrs returns the first IPv4 and first IPv6 address of a CiliumEndpoint. The Cilium agent
+// writes a single address pair holding both families, but every pair is checked.
+func cepAddrs(networking *ciliumv2.EndpointNetworking) (ipv4, ipv6 string) {
+	if networking == nil {
+		return "", ""
+	}
+	for _, pair := range networking.Addressing {
+		if pair == nil {
+			continue
+		}
+		if ipv4 == "" {
+			ipv4 = pair.IPV4
+		}
+		if ipv6 == "" {
+			ipv6 = pair.IPV6
+		}
+	}
+	return ipv4, ipv6
+}
+
+// keyCIDRLabelsLikeCilium re-keys cidr: labels parsed from a CiliumEndpoint. The printed IPv6 form
+// (cidr:fd00::1/128) parses to a different key than Cilium uses (fd00--1/128), which would make
+// unchanged labels compare unequal. IPv4 keys are unchanged.
+func keyCIDRLabelsLikeCilium(lbls labels.Labels) labels.Labels {
+	for k, l := range lbls {
+		pfx := l.GetCIDRPrefix()
+		if l.Source != labels.LabelSourceCIDR || pfx == nil {
+			continue
+		}
+		keyed, err := labels.IPStringToLabel(pfx.String())
+		if err != nil || keyed.Key == k {
+			continue
+		}
+		delete(lbls, k)
+		lbls[keyed.Key] = keyed
+	}
+	return lbls
 }
