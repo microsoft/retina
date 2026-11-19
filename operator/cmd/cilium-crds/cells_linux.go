@@ -234,7 +234,9 @@ var (
 
 	FlagsHooks []ProviderFlagsHooks
 
-	leaderElectionResourceLockName = "cilium-operator-resource-lock"
+	// Distinct from cilium-operator's "cilium-operator-resource-lock" so both operators
+	// can lead in the same namespace.
+	leaderElectionResourceLockName = "retina-operator-resource-lock"
 
 	// Use a Go context so we can tell the leaderelection code when we
 	// want to step down
