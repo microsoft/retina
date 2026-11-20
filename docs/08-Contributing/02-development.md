@@ -209,6 +209,50 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 
 ### Test
 
+#### Windows E2E
+
+The E2E workflow runs the existing suite separately on WS2022 and WS2025, using
+isolated clusters and the same multi-platform Retina image tag. Azure DevOps CI
+builds both Windows images and runs both suites sequentially; a WS2022 failure
+does not skip WS2025. The GitHub E2E workflow uses separate matrix jobs.
+
+Each run verifies the node build family and the running Retina image's
+`os.version` and snapshot chain, so a WS2025 node selecting a WS2022 image fails.
+Image verification runs immediately after installation, before metric scenarios.
+Existing Windows HNS and eBPF metrics and capture scenarios are reused.
+Azure NPM is retained for the Linux network-policy/drop scenarios; these tests
+do not establish Windows NPM support.
+
+To run one version locally with Azure credentials and published E2E images:
+
+```bash
+go test -v ./test/e2e/. -run '^TestE2ERetina$' -tags=e2e -timeout 60m -count=1 \
+  -args -windows-year=2025 -image-tag=<tag> \
+  -image-registry=<registry> -image-namespace=<namespace>
+```
+
+The shared tag must contain both Windows images with `os.version` metadata.
+For runtimes affected by ordering, place WS2025 before WS2022. The Windows
+event-writer/eBPF/XDP dependencies must support the target host; set
+`EVENT_WRITER_IMAGE` to override the event-writer image. These tests fail rather
+than skip unsupported driver installation or a mismatched Retina image.
+
+For existing infrastructure, select a single `windows_year` in the GitHub
+workflow (not `both`) and provide a cluster with only that Windows version.
+The default for a direct Go invocation remains `-windows-year=2022`.
+
+To exercise the image-checking PowerShell on an existing single-container
+Windows Retina agent without changing its deployment:
+
+```bash
+RETINA_WINDOWS_IMAGE_POD=<pod> RETINA_WINDOWS_IMAGE_YEAR=2025 \
+RETINA_WINDOWS_IMAGE_KUBECONFIG=<kubeconfig> \
+  go test ./test/e2e/scenarios/windows -run '^TestImageCheckOnWindows$' -count=1
+```
+
+This checks the running image and snapshot and verifies rejection of the other
+Windows image family. It does not run the full E2E suite or provision resources.
+
 ```bash
 make test # run unit-tests locally
 make test-image # run tests in docker container

@@ -15,6 +15,11 @@ on:
         required: true
         type: string
         description: The image namespace to use for the E2E tests.
+      windows_year:
+        required: false
+        default: 'both'
+        type: string
+        description: Windows Server version to test (2022, 2025, or both). Existing infrastructure requires one version.
       azure_location:
         required: true
         type: string
@@ -72,6 +77,12 @@ on:
         required: true
         type: string
         description: The image namespace to use for the E2E tests.
+      windows_year:
+        required: false
+        default: 'both'
+        type: choice
+        options: ['both', '2022', '2025']
+        description: Windows Server version to test. Existing infrastructure requires one version.
       azure_location:
         required: false
         type: string
@@ -111,13 +122,31 @@ permissions:
 
 jobs:
   e2e:
-    name: E2E
+    name: E2E Windows ${{ matrix.windows_year }}
+    strategy:
+      fail-fast: false
+      matrix:
+        windows_year: ${{ fromJSON(inputs.windows_year == 'both' && '["2022","2025"]' || format('["{0}"]', inputs.windows_year)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+      CLUSTER_NAME: retina-e2e-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.windows_year }}
 
     steps:
+      - name: Validate Windows test configuration
+        env:
+          WINDOWS_YEAR: ${{ inputs.windows_year }}
+          USE_EXISTING_INFRA: ${{ inputs.use_existing_infra }}
+        run: |
+          case "$WINDOWS_YEAR" in
+            2022|2025|both) ;;
+            *) echo "::error::windows_year must be 2022, 2025, or both"; exit 1 ;;
+          esac
+          if [ "$USE_EXISTING_INFRA" = "true" ] && [ "$WINDOWS_YEAR" = "both" ]; then
+            echo "::error::Select one windows_year when using existing infrastructure"
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -161,10 +190,10 @@ jobs:
             DELETE_INFRA=true
           fi
 
-          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag="$IMAGE_TAG" -image-registry="$IMAGE_REGISTRY" -image-namespace="$IMAGE_NAMESPACE" -create-infra="$CREATE_INFRA" -delete-infra="$DELETE_INFRA"
+          go test -v ./test/e2e/. -run '^TestE2ERetina$' -timeout 60m -tags=e2e -count=1 -args -windows-year="${{ matrix.windows_year }}" -image-tag="$IMAGE_TAG" -image-registry="$IMAGE_REGISTRY" -image-namespace="$IMAGE_NAMESPACE" -create-infra="$CREATE_INFRA" -delete-infra="$DELETE_INFRA"
 
       - name: Cleanup resource group
-        if: always()
+        if: always() && !inputs.use_existing_infra
         shell: bash
         run: |
           if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then

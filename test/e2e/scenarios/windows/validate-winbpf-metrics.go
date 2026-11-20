@@ -57,7 +57,6 @@ type ValidateWinBpfMetric struct {
 }
 
 func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
-	retinaLabelSelector := "k8s-app=retina"
 	var promOutput string
 	var err error
 	attempts := 10

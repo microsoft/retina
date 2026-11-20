@@ -3,8 +3,10 @@
 package pipelines
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,6 +44,7 @@ func findPipelineStep(t *testing.T, document *yaml.Node, displayName string) *ya
 }
 
 func TestPipelineUsesSelectedImageTagInsteadOfBuildTag(t *testing.T) {
+	t.Setenv("CLUSTER_NAME", "retina-e2e-test")
 	var step struct {
 		Env    map[string]yaml.Node `yaml:"env"`
 		Inputs struct {
@@ -186,6 +189,45 @@ func TestPipelineUsesSingleModeSelector(t *testing.T) {
 		}
 	}
 	require.True(t, found, "one E2E mode selector must replace the independent checkboxes")
+}
+
+func TestWindowsE2ERunsBothVersionsAfterFailure(t *testing.T) {
+	var step struct {
+		Inputs struct {
+			InlineScript string `yaml:"inlineScript"`
+		} `yaml:"inputs"`
+	}
+	require.NoError(t, findPipelineStep(t, readPipeline(t), "Run E2E Tests").Decode(&step))
+	t.Setenv("E2E_IMAGE_TAG", "candidate")
+	t.Setenv("IMAGE_REGISTRY", "registry.example.com")
+	t.Setenv("IMAGE_NAMESPACE", "retina")
+	t.Setenv("CLUSTER_NAME", "retina-e2e")
+	for _, fail2022 := range []bool{false, true} {
+		t.Run(fmt.Sprint("WS2022 failure=", fail2022), func(t *testing.T) {
+			t.Setenv("FAIL_2022", strconv.FormatBool(fail2022))
+			const mocks = `
+az() { printf '%s\n' test-subscription; }
+go() {
+  printf 'cluster=%s args=%s\n' "$CLUSTER_NAME" "$*"
+  if [ "$FAIL_2022" = true ] && [[ "$*" == *"-windows-year=2022"* ]]; then
+    return 1
+  fi
+}
+`
+			command := exec.CommandContext(t.Context(), "bash")
+			command.Stdin = strings.NewReader(mocks + step.Inputs.InlineScript)
+			output, err := command.CombinedOutput()
+			if fail2022 {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err, "%s", output)
+			}
+			require.Contains(t, string(output), "cluster=retina-e2e-2022")
+			require.Contains(t, string(output), "-windows-year=2022")
+			require.Contains(t, string(output), "cluster=retina-e2e-2025")
+			require.Contains(t, string(output), "-windows-year=2025")
+		})
+	}
 }
 
 func TestWindowsPRChecksCoverBuildFlowAndNativeImages(t *testing.T) {

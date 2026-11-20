@@ -81,6 +81,7 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 
 		job.AddStep(&azure.CreateNPMCluster{
 			ClusterName:  clusterName,
+			WindowsYear:  *common.WindowsYear,
 			PodCidr:      "10.128.0.0/9",
 			DNSServiceIP: "192.168.0.10",
 			ServiceCidr:  "192.168.0.0/28",
@@ -175,6 +176,11 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		KubeConfigFilePath: kubeConfigFilePath,
 		ChartPath:          chartPath,
 		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	job.AddStep(&windows.ValidateImage{
+		KubeConfigFilePath: kubeConfigFilePath,
+		Year:               *common.WindowsYear,
 	}, nil)
 
 	dnsScenarios := []struct {

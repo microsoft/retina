@@ -20,6 +20,7 @@ import (
 
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
+	require.Contains(t, []string{"2022", "2025"}, *common.WindowsYear, "windows-year must be 2022 or 2025")
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 

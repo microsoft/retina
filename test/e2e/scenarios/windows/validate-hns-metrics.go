@@ -49,7 +49,7 @@ func (v *ValidateHNSMetric) Run() error {
 	}
 
 	pods, err := clientset.CoreV1().Pods(v.RetinaDaemonSetNamespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "k8s-app=retina",
+		LabelSelector: retinaLabelSelector,
 	})
 	if err != nil {
 		panic(err.Error())
@@ -94,6 +94,9 @@ func (v *ValidateHNSMetric) Run() error {
 		return nil
 	})
 
+	if err != nil {
+		return fmt.Errorf("validating Windows HNS metrics: %w", err)
+	}
 	log.Printf("found metric matching %+v: with labels %+v\n", hnsMetricName, labels)
 	return nil
 }
