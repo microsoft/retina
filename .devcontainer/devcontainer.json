@@ -4,11 +4,11 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:4.1.3": {},
     "ghcr.io/devcontainers/features/github-cli:1.1.0": {},
-    // Keep both versions equal to go.mod: "version" to the go directive
+    // Keep both versions equal to go.mod: "version" to the toolchain line
     // (CI checks this), and "golangciLintVersion" to the golangci-lint tool,
     // so that the editor lints like CI.
     "ghcr.io/devcontainers/features/go:1.3.4": {
-      "version": "1.26.8",
+      "version": "1.27.4",
       "golangciLintVersion": "2.14.0"
     },
     // Only kubectl comes from this feature. go-setup installs Helm from
