@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	stderrors "errors"
 	"log/slog"
+	"net/netip"
 	"reflect"
 	"sync"
 	"time"
@@ -406,7 +407,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 		return nil
 	}
 
-	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+	ipv4, ipv6 := podAddrs(pod)
+	if (!ipv4.IsValid() && !ipv6.IsValid()) || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
 	}
@@ -429,7 +431,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	newPEP := &PodEndpoint{
 		key:    podKey,
 		lbls:   podLabels,
-		ipv4:   pod.Status.PodIP,
+		ipv4:   addrString(ipv4),
+		ipv6:   addrString(ipv6),
 		nodeIP: pod.Status.HostIP,
 		// TODO: set to false if in follower mode
 		processedAsLeader: true,
@@ -513,25 +516,27 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				"networking", oldCEP.Status.Networking,
 			)
 
-			if oldCEP.Status.Networking == nil || len(oldCEP.Status.Networking.Addressing) == 0 || oldCEP.Status.Networking.Addressing[0].IPV4 == "" {
-				// FIXME handle IPv6 and dual-stack
-				inStore = false
-				r.l.Warn("CiliumEndpoint has no ipv4 address, ignoring",
+			oldIPv4, oldIPv6 := cepAddrs(oldCEP.Status.Networking)
+			if oldIPv4 == "" && oldIPv6 == "" {
+				// Patch rather than create: the CEP exists, so a create would fail with AlreadyExists.
+				r.l.Warn("CiliumEndpoint has no valid IP address, repairing",
 					"podKey", newPEP.key.String(),
 					"cep", oldCEP,
 				)
-			} else {
-				oldPEP = &PodEndpoint{
-					key:        newPEP.key,
-					endpointID: oldCEP.Status.ID,
-					ipv4:       oldCEP.Status.Networking.Addressing[0].IPV4,
-					nodeIP:     oldCEP.Status.Networking.NodeIP,
-				}
+			}
+			oldPEP = &PodEndpoint{
+				key:        newPEP.key,
+				endpointID: oldCEP.Status.ID,
+				ipv4:       oldIPv4,
+				ipv6:       oldIPv6,
+			}
+			if oldCEP.Status.Networking != nil {
+				oldPEP.nodeIP = oldCEP.Status.Networking.NodeIP
+			}
 
-				if oldCEP.Status.Identity != nil {
-					oldPEP.identityID = oldCEP.Status.Identity.ID
-					oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
-				}
+			if oldCEP.Status.Identity != nil {
+				oldPEP.identityID = oldCEP.Status.Identity.ID
+				oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
 			}
 		}
 	}
@@ -542,7 +547,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		newPEP.endpointID = oldPEP.endpointID
 		newPEP.identityID = oldPEP.identityID
 
-		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.nodeIP == oldPEP.nodeIP
+		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.ipv6 == oldPEP.ipv6 && newPEP.nodeIP == oldPEP.nodeIP
 		equalLabels := newPEP.lbls.Equals(oldPEP.lbls)
 
 		r.l.Debug("patching CiliumEndpoint",
@@ -836,4 +841,74 @@ func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string)
 	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
 	r.windowsNodes[nodeName] = isWindows
 	return isWindows, nil
+}
+
+// podAddrs returns the Pod's first IPv4 and first IPv6 address from Status.PodIPs,
+// falling back to Status.PodIP. A missing family is returned as the zero netip.Addr.
+func podAddrs(pod *slim_corev1.Pod) (ipv4, ipv6 netip.Addr) {
+	ips := make([]string, 0, len(pod.Status.PodIPs)+1)
+	for _, ip := range pod.Status.PodIPs {
+		ips = append(ips, ip.IP)
+	}
+	if len(ips) == 0 {
+		ips = append(ips, pod.Status.PodIP)
+	}
+	for _, ip := range ips {
+		addr, ok := parseAddr(ip)
+		if !ok {
+			continue
+		}
+		switch {
+		case addr.Is4() && !ipv4.IsValid():
+			ipv4 = addr
+		case addr.Is6() && !ipv6.IsValid():
+			ipv6 = addr
+		}
+	}
+	return ipv4, ipv6
+}
+
+// addrString returns the address in Cilium's CiliumEndpoint format, or "" for the zero netip.Addr.
+func addrString(addr netip.Addr) string {
+	if !addr.IsValid() {
+		return ""
+	}
+	return addr.String()
+}
+
+// parseAddr parses ip, rejecting zoned addresses and unmapping IPv4-mapped IPv6 addresses.
+func parseAddr(ip string) (netip.Addr, bool) {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.Zone() != "" {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+// cepAddrs returns the first valid IPv4 and first valid IPv6 address of a CiliumEndpoint in
+// canonical form. Addresses are slotted by their family rather than by field, since older
+// writers stored an IPv6 primary pod IP in the IPV4 field.
+func cepAddrs(networking *ciliumv2.EndpointNetworking) (ipv4, ipv6 string) {
+	if networking == nil {
+		return "", ""
+	}
+	var v4, v6 netip.Addr
+	for _, pair := range networking.Addressing {
+		if pair == nil {
+			continue
+		}
+		for _, ip := range []string{pair.IPV4, pair.IPV6} {
+			addr, ok := parseAddr(ip)
+			if !ok {
+				continue
+			}
+			switch {
+			case addr.Is4() && !v4.IsValid():
+				v4 = addr
+			case addr.Is6() && !v6.IsValid():
+				v6 = addr
+			}
+		}
+	}
+	return addrString(v4), addrString(v6)
 }

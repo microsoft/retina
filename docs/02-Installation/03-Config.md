@@ -162,6 +162,12 @@ To disable the feature, update `windows-cilium-values.yaml` so it has the full o
 
 Without these flags, the Retina operator goes back to its default mode. It creates CiliumEndpoints for all Pods, including Linux Pods that Cilium manages, and allocates its own identities instead of reusing cilium-operator identities. This is not a neutral rollback. Don't use the default mode in a cluster where Cilium manages Linux endpoints.
 
+##### Dual-Stack Pods
+
+On dual-stack clusters, the operator publishes both addresses of a Windows Pod automatically. No flag is needed. The CiliumEndpoint gets one address pair with the Pod's first IPv4 and first IPv6 address from `status.podIPs`. Existing CiliumEndpoints, such as IPv4-only endpoints created by an earlier version, are updated in place when the Pod's addresses differ.
+
+Dual-stack networking must already be configured for the cluster and the Windows nodes, so that Pods receive both an IPv4 and an IPv6 address. Retina does not configure IPv6. On single-stack clusters, the endpoint has only the Pod's single address, as before.
+
 #### Verification
 
 1. Check that the operator runs with both flags and has reused cilium-operator identities:
@@ -179,6 +185,8 @@ Without these flags, the Retina operator goes back to its default mode. It creat
     kubectl get ciliumendpoint -n $NS $POD \
         -o jsonpath='{.status.identity.id}{"\n"}{.status.networking.addressing}{"\n"}'
     ```
+
+    On dual-stack clusters, `addressing` has one entry with both `ipv4` and `ipv6`, matching the Pod's `status.podIPs`.
 
 3. Check that the identity was created by cilium-operator for the Pod's labels:
 

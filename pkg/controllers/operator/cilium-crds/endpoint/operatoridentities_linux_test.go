@@ -14,6 +14,7 @@ import (
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/testutils"
+	"github.com/cilium/cilium/pkg/k8s/identitybackend"
 	v1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
 	slim_metav1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/meta/v1"
 	"github.com/cilium/cilium/pkg/labels"
@@ -34,6 +35,7 @@ const (
 	testAppKey            = "app"
 	testOtherApp          = "other"
 	testWebApp            = "web"
+	testClusterName       = "aks-prod"
 )
 
 func useDefaultLabelFilter(t *testing.T) {
@@ -83,7 +85,7 @@ var hashLabels = []string{"pod-template-hash", "controller-revision-hash", "pod-
 
 func TestReuseOperatorIdentitiesKeyParity(t *testing.T) {
 	useDefaultLabelFilter(t)
-	setClusterName(t, "aks-prod")
+	setClusterName(t, testClusterName)
 	r, ns := newOperatorLabelsTestReconciler(t, true)
 
 	for name, pod := range operatorTestPods() {
@@ -101,7 +103,7 @@ func TestReuseOperatorIdentitiesKeyParity(t *testing.T) {
 			for _, h := range hashLabels {
 				require.NotContains(t, lbls, h)
 			}
-			require.Equal(t, "aks-prod", lbls["io.cilium.k8s.policy.cluster"].Value)
+			require.Equal(t, testClusterName, lbls["io.cilium.k8s.policy.cluster"].Value)
 			require.Equal(t, "web-sa", lbls["io.cilium.k8s.policy.serviceaccount"].Value)
 			require.Equal(t, "payments", lbls["io.cilium.k8s.namespace.labels.team"].Value)
 			require.Equal(t, testWebApp, lbls[testAppKey].Value)
@@ -233,12 +235,12 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		createCiliumConfig(t, r, map[string]string{
 			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-			ciliumConfigClusterName:            "aks-prod",
+			ciliumConfigClusterName:            testClusterName,
 		})
 
 		waitSetupDone(t, r)
 		require.NotNil(t, r.identityManager)
-		require.Equal(t, "aks-prod", option.Config.ClusterName)
+		require.Equal(t, testClusterName, option.Config.ClusterName)
 	})
 
 	t.Run("Stop before Start", func(t *testing.T) {
@@ -253,11 +255,11 @@ func TestReuseOperatorIdentitiesStartupValidation(t *testing.T) {
 		r.cfg = Config{ReuseOperatorIdentities: true}
 		createCiliumConfig(t, r, map[string]string{
 			ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
-			ciliumConfigClusterName:            "aks-prod",
+			ciliumConfigClusterName:            testClusterName,
 			ciliumConfigLabels:                 "k8s:app  k8s:io.kubernetes.pod.namespace",
 		})
 		require.NoError(t, r.setupOperatorIdentities(context.TODO()))
-		require.Equal(t, "aks-prod", option.Config.ClusterName)
+		require.Equal(t, testClusterName, option.Config.ClusterName)
 
 		identityLabels, _ := labelsfilter.Filter(labels.Map2Labels(map[string]string{
 			testAppKey: testWebApp, "team": "payments", testNamespaceLabel: testNamespace,
@@ -366,4 +368,75 @@ func TestOperatorManagedIdentityReconcileAfterIdentityCreated(t *testing.T) {
 	require.NotNil(t, cep.Status.Identity)
 	require.Equal(t, int64(12345), cep.Status.Identity.ID)
 	require.Equal(t, 1, countIdentities())
+}
+
+func TestCombinedModeDualStackReusesOperatorIdentity(t *testing.T) {
+	useDefaultLabelFilter(t)
+	setClusterName(t, "")
+
+	l := slog.Default()
+	ciliumEndpoints := ciliumutil.NewMockResource[*ciliumv2.CiliumEndpoint](l)
+	fakeClientSet, _ := ciliumclient.NewFakeClientset(l)
+	r := &endpointReconciler{
+		l:                   l,
+		clientset:           ciliumutil.NewMockVersionedClient(l, ciliumEndpoints),
+		ciliumEndpoints:     ciliumEndpoints,
+		ciliumSlimClientSet: fakeClientSet.SlimFakeClientset,
+		k8sClient:           fakeClientSet,
+		store:               NewStore(),
+		Mutex:               &sync.Mutex{},
+		windowsNodes:        make(map[string]bool),
+		cfg:                 Config{WindowsOnlyEndpoints: true, ReuseOperatorIdentities: true},
+	}
+	createCiliumConfig(t, r, map[string]string{
+		ciliumConfigIdentityManagementMode: option.IdentityManagementModeOperator,
+		ciliumConfigClusterName:            testClusterName,
+	})
+	require.NoError(t, r.setupOperatorIdentities(context.TODO()))
+
+	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
+	im, err := NewIdentityManager(context.TODO(), l, fakeClientSet.CiliumFakeClientset, true)
+	require.NoError(t, err)
+	r.identityManager = im
+
+	coreV1 := r.ciliumSlimClientSet.CoreV1()
+	createNamespace(coreV1)
+	createNode(t, coreV1, "linux-node", "linux")
+	createNode(t, coreV1, "win-node", "windows")
+
+	linuxKey, linuxPod := podOnNode("linux-pod", "linux-node", testIPv4)
+	withPodIPs(linuxPod, testIPv4, testIPv6)
+	winKey, winPod := podOnNode("win-pod", "win-node", testIPv4)
+	withPodIPs(winPod, testIPv4, testIPv6)
+	winPod.Labels["pod-template-hash"] = "7d4b9c"
+
+	// Seed the identity as cilium-operator's CID controller would (operator/pkg/ciliumidentity createCID).
+	ns, err := coreV1.Namespaces().Get(context.TODO(), winPod.Namespace, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, podLabels := k8s.GetPodMetadata(l, ns, winPod)
+	cidKey := identitykey.GetCIDKeyFromLabels(podLabels, labels.LabelSourceK8s)
+	cids := fakeClientSet.CiliumFakeClientset.CiliumV2().CiliumIdentities()
+	_, err = cids.Create(context.TODO(), &ciliumv2.CiliumIdentity{
+		ObjectMeta:     metav1.ObjectMeta{Name: "12345", Labels: identitybackend.SelectK8sLabels(cidKey.GetAsMap())},
+		SecurityLabels: cidKey.GetAsMap(),
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	require.NoError(t, r.ReconcilePod(context.TODO(), linuxKey, linuxPod))
+	assertCEPDoesNotExist(t, ciliumEndpoints, linuxKey)
+
+	require.Eventually(t, func() bool {
+		return r.ReconcilePod(context.TODO(), winKey, winPod) == nil
+	}, 10*time.Second, 50*time.Millisecond)
+
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	require.NotNil(t, cep.Status.Networking)
+	require.Equal(t, ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: testIPv6}}, cep.Status.Networking.Addressing)
+	require.NotNil(t, cep.Status.Identity)
+	require.Equal(t, int64(12345), cep.Status.Identity.ID)
+	require.NotContains(t, cep.Status.Identity.Labels, "k8s:pod-template-hash=7d4b9c")
+
+	list, err := cids.List(context.TODO(), metav1.ListOptions{})
+	require.NoError(t, err)
+	require.Len(t, list.Items, 1, "no new CiliumIdentity may be created")
 }
