@@ -41,7 +41,18 @@ static __always_inline void submit_packetparser_event(struct __sk_buff *skb, str
 {
 	long ret;
 #ifdef USE_RING_BUFFER
-	ret = bpf_ringbuf_output(&retina_packetparser_events, p, sizeof(*p), 0);
+	// A wakeup for each event costs more than the write of the event. Wake the reader
+	// only for the event that moves the unread data across a multiple of
+	// RING_BUFFER_WAKEUP_SIZE, in bytes. The agent sets that size at compile time. Below
+	// that size, the reader gets the events when its read deadline expires.
+	// The query and the write are not atomic. If two CPUs cross a multiple at the same
+	// time and none of them sends the wakeup, a later multiple or the read deadline of
+	// the reader delivers the events.
+	__u64 avail = bpf_ringbuf_query(&retina_packetparser_events, BPF_RB_AVAIL_DATA);
+	__u64 flags = BPF_RB_NO_WAKEUP;
+	if (avail / RING_BUFFER_WAKEUP_SIZE != (avail + sizeof(*p) + BPF_RINGBUF_HDR_SZ) / RING_BUFFER_WAKEUP_SIZE)
+		flags = BPF_RB_FORCE_WAKEUP;
+	ret = bpf_ringbuf_output(&retina_packetparser_events, p, sizeof(*p), flags);
 #else
 	ret = bpf_perf_event_output(skb, &retina_packetparser_events, BPF_F_CURRENT_CPU, p, sizeof(*p));
 #endif
