@@ -640,22 +640,15 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 
 	var st string
 	st += fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", opts.bypassFilter)
+	conntrackMetrics := 0
 	if opts.enableConntrack {
-		st += "#define ENABLE_CONNTRACK_METRICS 1\n"
+		conntrackMetrics = 1
 	}
+	st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
+	st += "#define CT_REPORT_INTERVAL 30\n"
 	st += fmt.Sprintf("#define DATA_AGGREGATION_LEVEL %d\n", opts.aggregationLevel)
 	st += fmt.Sprintf("#define DATA_SAMPLING_RATE %d\n", opts.samplingRate)
 	require.NoError(t, os.WriteFile(ppDynamic, []byte(st), 0o644))
-
-	// Write conntrack dynamic.h if conntrack metrics enabled.
-	ctDynamic := fmt.Sprintf("%s/../conntrack/%s/%s", dir, bpfSourceDir, dynamicHeaderFileName)
-	origCT, err := os.ReadFile(ctDynamic)
-	require.NoError(t, err)
-	t.Cleanup(func() { os.WriteFile(ctDynamic, origCT, 0o644) }) //nolint:errcheck
-
-	if opts.enableConntrack {
-		require.NoError(t, os.WriteFile(ctDynamic, []byte("#define ENABLE_CONNTRACK_METRICS 1\n#define CT_REPORT_INTERVAL 30\n"), 0o644))
-	}
 
 	// Compile the eBPF program.
 	bpfSourceFile := fmt.Sprintf("%s/%s/%s", dir, bpfSourceDir, bpfSourceFileName)
@@ -678,7 +671,6 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 		fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir),
 		fmt.Sprintf("-I%s/../lib/common/libbpf/_include/asm", dir),
 		fmt.Sprintf("-I%s/../filter/_cprog/", dir),
-		fmt.Sprintf("-I%s/../conntrack/_cprog/", dir),
 	}
 	if opts.enableRingBuf {
 		cflags = append(cflags, "-DUSE_RING_BUFFER", "-DRING_BUFFER_SIZE=4096")
