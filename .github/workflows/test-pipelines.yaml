@@ -7,12 +7,14 @@ on:
     paths:
       - ".azure-pipelines/**"
       - ".github/workflows/test-pipelines.yaml"
+      - ".github/workflows/test.yaml"
       - "test/pipelines/**"
   pull_request:
     branches: [main]
     paths:
       - ".azure-pipelines/**"
       - ".github/workflows/test-pipelines.yaml"
+      - ".github/workflows/test.yaml"
       - "test/pipelines/**"
   workflow_dispatch:
 
@@ -42,7 +44,8 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           changed_files=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- \
-            .azure-pipelines .github/workflows/test-pipelines.yaml test/pipelines)
+            .azure-pipelines .github/workflows/test-pipelines.yaml \
+            .github/workflows/test.yaml test/pipelines)
           if [[ -n "$changed_files" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else

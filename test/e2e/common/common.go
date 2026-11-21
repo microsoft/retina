@@ -30,6 +30,7 @@ var (
 	Architectures  = []string{"amd64", "arm64"}
 	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+	WindowsYear    = flag.String("windows-year", "2022", "Windows Server version to provision and validate: 2022 or 2025")
 	ScaleTestInfra = ScaleTestInfraHandler{
 		location:       params.Location,
 		subscriptionID: params.SubscriptionID,

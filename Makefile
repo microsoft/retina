@@ -43,6 +43,8 @@ OS_VERSION		?= ltsc2022
 
 CONTAINER_BUILDER ?= docker
 CONTAINER_RUNTIME ?= docker
+# Capture local-build selections before applying single-image packaging defaults.
+WINDOWS_LOCAL_YEARS := $(or $(YEAR),$(WINDOWS_YEARS),2022 2025)
 YEAR 			  ?= 2022
 
 ALL_ARCH.linux = amd64 arm64
@@ -66,6 +68,12 @@ RETINA_PLATFORM_TAG        ?= $(TAG)-$(subst /,-,$(PLATFORM))
 AGENT_TARGETS ?= init agent
 
 WINDOWS_YEARS ?= 2022
+WINDOWS_DOCKER ?= docker
+REPO_PATH ?= .
+BINARIES_PATH ?= output/windows_$(GOARCH)
+WINDOWS_LOCAL_BINARIES ?= output/local/windows_$(GOARCH)
+WINDOWS_LOCAL_TAG = $(TAG)-local-windows-ltsc$(YEAR)-amd64
+WINDOWS_LOCAL_ARCHIVE ?= $(ARTIFACTS_DIR)/retina-agent-$(WINDOWS_LOCAL_TAG).tar
 
 # for windows os, add year to the platform tag
 ifeq ($(OS),windows)
@@ -243,7 +251,7 @@ container-docker-windows: # util target to build Windows container images withou
 	arch=$$(echo $(PLATFORM) | cut -d'/' -f2); \
 	image_name=$$(basename $(IMAGE)); \
 	echo "Building $$image_name for $$os/$$arch "; \
-	docker build \
+	$(WINDOWS_DOCKER) build \
 		--platform $(PLATFORM) \
 		-f $(DOCKERFILE) \
 		--build-arg BUILDPLATFORM=$(PLATFORM) \
@@ -281,9 +289,80 @@ retina-image: ## build the retina linux container image.
 				TARGET=$$target; \
 	done
 
-retina-image-win: build-windows-binaries ## build the retina Windows container image.
+.PHONY: make-win check-windows-platform check-windows-local check-windows-build retina-image-win-local retina-image-win build-windows-binaries
+
+make-win: BUILDX_ACTION ?= --push
+make-win: ## cross-build and push both development Windows images; set YEAR for one version.
+	@if [ "$(words $(WINDOWS_LOCAL_YEARS))" -gt 1 ] && [ -z "$(strip $(BUILDX_ACTION))" ] && [ "$(origin WINDOWS_LOCAL_ARCHIVE)" != "file" ]; then \
+		echo "Set YEAR=2022 or YEAR=2025 when overriding WINDOWS_LOCAL_ARCHIVE." >&2; exit 1; \
+	fi
+	$(MAKE) check-windows-local YEAR="$(WINDOWS_LOCAL_YEARS)"
+	$(MAKE) build-windows-binaries BUILD_DIR="$(REPO_ROOT)/$(WINDOWS_LOCAL_BINARIES)" APP_INSIGHTS_ID=
+	@set -e; \
+	for year in $(WINDOWS_LOCAL_YEARS); do \
+		$(MAKE) retina-image-win-local YEAR=$$year BUILDX_ACTION="$(BUILDX_ACTION)"; \
+	done
+
+check-windows-platform:
+	@set -e; \
+	if [ "$(GOARCH)" != "amd64" ]; then \
+		echo "Windows agent images support GOARCH=amd64 only." >&2; exit 1; \
+	fi; \
+	if [ -z "$(strip $(WINDOWS_YEARS))" ]; then \
+		echo "WINDOWS_YEARS must contain 2022 or 2025." >&2; exit 1; \
+	fi; \
+	for year in $(WINDOWS_YEARS); do \
+		case "$$year" in \
+			2022|2025) ;; \
+			*) echo "Unsupported Windows image year: $$year (use 2022 or 2025)." >&2; exit 1 ;; \
+		esac; \
+	done
+
+check-windows-local:
+	$(MAKE) check-windows-platform WINDOWS_YEARS="$(YEAR)"
+	@$(WINDOWS_DOCKER) buildx version > /dev/null || { \
+		echo "Local Windows assembly requires Docker Buildx." >&2; exit 1; \
+	}
+
+retina-image-win-local: check-windows-local ## package local Windows binaries; set BUILDX_ACTION=--push to publish.
+	@set -e; \
+	for binary in controller.exe captureworkload.exe; do \
+		if [ ! -f "$(REPO_ROOT)/$(WINDOWS_LOCAL_BINARIES)/$$binary" ]; then \
+			echo "Missing $(WINDOWS_LOCAL_BINARIES)/$$binary. Run make make-win YEAR=$(YEAR)." >&2; exit 1; \
+		fi; \
+	done; \
+	echo "LOCAL DEVELOPMENT ONLY: unsigned binaries, no CVE-2013-3900 registry hardening; not for production." >&2
+	@mkdir -p "$(dir $(WINDOWS_LOCAL_ARCHIVE))"
+	$(WINDOWS_DOCKER) buildx build \
+		--platform windows/amd64 \
+		--provenance=false \
+		--file hack/windows/Dockerfile.local \
+		--build-arg OS_VERSION=ltsc$(YEAR) \
+		--build-arg BINARIES_PATH=$(WINDOWS_LOCAL_BINARIES) \
+		--tag $(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(WINDOWS_LOCAL_TAG) \
+		$(if $(strip $(BUILDX_ACTION)),$(BUILDX_ACTION),--output "type=docker,dest=$(WINDOWS_LOCAL_ARCHIVE)") \
+		"$(REPO_ROOT)"
+	$(if $(strip $(BUILDX_ACTION)),@echo "Built Windows development image: $(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(WINDOWS_LOCAL_TAG)",@echo "Local Windows image archive: $(WINDOWS_LOCAL_ARCHIVE)")
+
+check-windows-build: check-windows-platform
+	@set -e; \
+	docker_os=$$($(WINDOWS_DOCKER) info --format '{{.OSType}}') || { \
+		echo "Cannot reach Windows Docker. Start a Windows-container daemon or set WINDOWS_DOCKER." >&2; exit 1; \
+	}; \
+	if [ "$$(printf '%s' "$$docker_os" | tr -d '\r')" != "windows" ]; then \
+		echo "Windows images require a Windows Docker daemon; current daemon is $$docker_os. Switch Docker to Windows containers or use a Windows build host." >&2; exit 1; \
+	fi
+
+retina-image-win: check-windows-build ## package prebuilt Windows binaries without rebuilding or signing them.
 # The Windows images are built on a corresponding Windows host without buildx.
 # This is done to mitigate CVE-2013-3900.
+	@set -e; \
+	for binary in controller.exe captureworkload.exe; do \
+		if [ ! -f "$(REPO_ROOT)/$(BINARIES_PATH)/$$binary" ]; then \
+			echo "Missing $(BINARIES_PATH)/$$binary. Use make make-win for a local unsigned build, or supply prebuilt binaries via BINARIES_PATH." >&2; exit 1; \
+		fi; \
+	done
+	set -e; \
 	for year in $(WINDOWS_YEARS); do \
 		tag=$(TAG)-windows-ltsc$$year-amd64; \
 		echo "Building $$tag"; \
@@ -386,6 +465,7 @@ all-gen: ## generate all code
 	$(MAKE) proto-gen
 	$(MAKE) go-gen
 
+build-windows-binaries: BUILD_DIR = $(OUTPUT_DIR)/windows_$(GOARCH)
 build-windows-binaries: ## Build Windows binaries
 	@echo "Building Windows binaries for $(GOARCH)..."
 	@mkdir -p $(BUILD_DIR)
@@ -405,30 +485,41 @@ build-windows-binaries: ## Build Windows binaries
 
 # Command that creates a multi-arch index from per-platform image references.
 # The Azure DevOps pipeline has no docker CLI and passes hack/scripts/oras-index.sh.
+# Plain Buildx can omit Windows os.version from index descriptors. docker-index.sh
+# restores it from image configs so runtimes can distinguish WS2022 from WS2025.
+# Use the helper only for Windows-containing agent manifests; explicit overrides
+# and Linux-only manifests retain MANIFEST_CREATE.
+ifdef MANIFEST_CREATE
+WINDOWS_MANIFEST_CREATE ?= $(MANIFEST_CREATE)
+else
+WINDOWS_MANIFEST_CREATE ?= bash hack/scripts/docker-index.sh
+endif
 MANIFEST_CREATE ?= docker buildx imagetools create -t
 MANIFEST_TAG ?= $(TAG)
+LINUX_PLATFORMS ?= linux/amd64 linux/arm64
+WINDOWS_TAG_PREFIX ?= $(TAG)
 
 manifest-retina-image: ## create a multiplatform manifest for the retina image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE))
 	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
-	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(if $(strip $(WINDOWS_YEARS)),$(WINDOWS_MANIFEST_CREATE),$(MANIFEST_CREATE)) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform))) $(foreach year,$(WINDOWS_YEARS), $(FULL_IMAGE_NAME):$(WINDOWS_TAG_PREFIX)-windows-ltsc$(year)-amd64)
+	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_INIT_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-shell-image:
 	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE))
-	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,$(LINUX_PLATFORMS), $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest:
 	echo "Building for $(COMPONENT)"

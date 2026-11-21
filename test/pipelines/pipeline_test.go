@@ -3,8 +3,10 @@
 package pipelines
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,6 +44,7 @@ func findPipelineStep(t *testing.T, document *yaml.Node, displayName string) *ya
 }
 
 func TestPipelineUsesSelectedImageTagInsteadOfBuildTag(t *testing.T) {
+	t.Setenv("CLUSTER_NAME", "retina-e2e-test")
 	var step struct {
 		Env    map[string]yaml.Node `yaml:"env"`
 		Inputs struct {
@@ -186,4 +189,129 @@ func TestPipelineUsesSingleModeSelector(t *testing.T) {
 		}
 	}
 	require.True(t, found, "one E2E mode selector must replace the independent checkboxes")
+}
+
+func TestWindowsE2ERunsBothVersionsAfterFailure(t *testing.T) {
+	var step struct {
+		Inputs struct {
+			InlineScript string `yaml:"inlineScript"`
+		} `yaml:"inputs"`
+	}
+	require.NoError(t, findPipelineStep(t, readPipeline(t), "Run E2E Tests").Decode(&step))
+	t.Setenv("E2E_IMAGE_TAG", "candidate")
+	t.Setenv("IMAGE_REGISTRY", "registry.example.com")
+	t.Setenv("IMAGE_NAMESPACE", "retina")
+	t.Setenv("CLUSTER_NAME", "retina-e2e")
+	for _, fail2022 := range []bool{false, true} {
+		t.Run(fmt.Sprint("WS2022 failure=", fail2022), func(t *testing.T) {
+			t.Setenv("FAIL_2022", strconv.FormatBool(fail2022))
+			const mocks = `
+az() { printf '%s\n' test-subscription; }
+go() {
+  printf 'cluster=%s args=%s\n' "$CLUSTER_NAME" "$*"
+  if [ "$FAIL_2022" = true ] && [[ "$*" == *"-windows-year=2022"* ]]; then
+    return 1
+  fi
+}
+`
+			command := exec.CommandContext(t.Context(), "bash")
+			command.Stdin = strings.NewReader(mocks + step.Inputs.InlineScript)
+			output, err := command.CombinedOutput()
+			if fail2022 {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err, "%s", output)
+			}
+			require.Contains(t, string(output), "cluster=retina-e2e-2022")
+			require.Contains(t, string(output), "-windows-year=2022")
+			require.Contains(t, string(output), "cluster=retina-e2e-2025")
+			require.Contains(t, string(output), "-windows-year=2025")
+		})
+	}
+}
+
+func TestWindowsPRChecksCoverBuildFlowAndNativeImages(t *testing.T) {
+	data, err := os.ReadFile("../../.github/workflows/test.yaml")
+	require.NoError(t, err)
+	type step struct {
+		Name string            `yaml:"name"`
+		Uses string            `yaml:"uses"`
+		Run  string            `yaml:"run"`
+		With map[string]string `yaml:"with"`
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			RunsOn   string `yaml:"runs-on"`
+			Needs    string `yaml:"needs"`
+			Strategy struct {
+				Matrix struct {
+					Year []string `yaml:"year"`
+				} `yaml:"matrix"`
+			} `yaml:"strategy"`
+			Steps []step `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &workflow))
+
+	unit, exists := workflow.Jobs["test-windows"]
+	require.True(t, exists)
+	require.Equal(t, "windows-${{ matrix.year }}", unit.RunsOn)
+	require.ElementsMatch(t, []string{"2022", "2025"}, unit.Strategy.Matrix.Year)
+	var runsUnitTests bool
+	for _, s := range unit.Steps {
+		if strings.TrimSpace(s.Run) == "make test-windows" {
+			runsUnitTests = true
+		}
+	}
+	require.True(t, runsUnitTests, "both Windows runners must execute the unit-test suite")
+
+	build, exists := workflow.Jobs["test-windows-build"]
+	require.True(t, exists)
+	require.Equal(t, "ubuntu-latest", build.RunsOn)
+	var compile, upload *step
+	for index := range build.Steps {
+		s := &build.Steps[index]
+		if strings.Contains(s.Run, "make build-windows-binaries") {
+			compile = s
+		}
+		if strings.HasPrefix(s.Uses, "actions/upload-artifact@") {
+			upload = s
+		}
+	}
+	require.NotNil(t, compile, "both Windows images must consume shared prebuilt binaries")
+	require.Contains(t, compile.Run, "APP_INSIGHTS_ID=")
+	require.NotNil(t, upload)
+	require.Equal(t, "windows-test-binaries", upload.With["name"])
+	require.Equal(t, "output/windows_amd64/", upload.With["path"])
+	require.Equal(t, "error", upload.With["if-no-files-found"])
+
+	images, exists := workflow.Jobs["test-windows-images"]
+	require.True(t, exists)
+	require.Equal(t, "test-windows-build", images.Needs)
+	require.Equal(t, "windows-${{ matrix.year }}", images.RunsOn)
+	require.ElementsMatch(t, []string{"2022", "2025"}, images.Strategy.Matrix.Year)
+	var download, packaging, hardening *step
+	for index := range images.Steps {
+		s := &images.Steps[index]
+		require.NotContains(t, s.Run, "docker push", "PR validation must not publish images")
+		require.NotContains(t, s.Run, "--push", "PR validation must not publish images")
+		if strings.HasPrefix(s.Uses, "actions/download-artifact@") {
+			download = s
+		}
+		if strings.Contains(s.Run, "make retina-image-win") {
+			packaging = s
+		}
+		if strings.Contains(s.Run, "EnableCertPaddingCheck") {
+			hardening = s
+		}
+	}
+	require.NotNil(t, download)
+	require.Equal(t, upload.With["name"], download.With["name"])
+	require.Equal(t, upload.With["path"], download.With["path"])
+	require.NotNil(t, packaging, "native Windows runners must build the Windows images")
+	require.Contains(t, packaging.Run, "WINDOWS_YEARS=${{ matrix.year }}")
+	require.Contains(t, packaging.Run, "BINARIES_PATH=output/windows_amd64")
+	require.NotNil(t, hardening, "validate registry hardening in the resulting image")
+	require.Contains(t, hardening.Run, `HKLM:\Software\Microsoft\Cryptography\Wintrust\Config`)
+	require.Contains(t, hardening.Run, `HKLM:\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config`)
 }

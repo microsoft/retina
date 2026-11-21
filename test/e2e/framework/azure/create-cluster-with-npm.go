@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -13,8 +14,9 @@ import (
 )
 
 var (
-	ErrResourceNameTooLong = fmt.Errorf("resource name too long")
-	ErrEmptyFile           = fmt.Errorf("empty file")
+	ErrResourceNameTooLong    = errors.New("resource name too long")
+	ErrEmptyFile              = errors.New("empty file")
+	errUnsupportedWindowsYear = errors.New("unsupported Windows year")
 )
 
 const (
@@ -36,10 +38,23 @@ type CreateNPMCluster struct {
 	DNSServiceIP      string
 	ServiceCidr       string
 	PublicIPs         []string
+	WindowsYear       string
 }
 
 func (c *CreateNPMCluster) Prevalidate() error {
-	return nil
+	_, err := windowsOSSKU(c.WindowsYear)
+	return err
+}
+
+func windowsOSSKU(year string) (armcontainerservice.OSSKU, error) {
+	switch year {
+	case "", "2022":
+		return armcontainerservice.OSSKUWindows2022, nil
+	case "2025":
+		return armcontainerservice.OSSKU("Windows2025"), nil
+	default:
+		return "", fmt.Errorf("%w %q: use 2022 or 2025", errUnsupportedWindowsYear, year)
+	}
 }
 
 func (c *CreateNPMCluster) Stop() error {
@@ -47,6 +62,10 @@ func (c *CreateNPMCluster) Stop() error {
 }
 
 func (c *CreateNPMCluster) Run() error {
+	windowsSKU, err := windowsOSSKU(c.WindowsYear)
+	if err != nil {
+		return err
+	}
 	// Start with default cluster template
 	npmCluster := GetStarterClusterTemplate(c.Location)
 
@@ -59,10 +78,10 @@ func (c *CreateNPMCluster) Run() error {
 		EnableNodePublicIP: to.Ptr(false),
 		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
-		OSSKU:              to.Ptr(armcontainerservice.OSSKUWindows2022),
+		OSSKU:              to.Ptr(windowsSKU),
 		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
 		VMSize:             to.Ptr(AgentWindowsSKU),
-		Name:               to.Ptr("ws22"),
+		Name:               to.Ptr("windows"),
 		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
 	})
 
