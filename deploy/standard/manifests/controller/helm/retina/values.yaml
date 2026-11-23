@@ -122,8 +122,10 @@ daemonset:
         - "--config"
         - "/retina/config/config.yaml"
       env: []
-      healthProbeBindAddress: ":18081"
-      metricsBindAddress: ":18080"
+      # :18080 collides with the node-local coredns that OpenShift's DNS
+      # node-resolver listens on, since the agent runs with hostNetwork.
+      healthProbeBindAddress: ":18091"
+      metricsBindAddress: ":18090"
       ports:
         containerPort: 10093
   telemetryInterval: "15m"
