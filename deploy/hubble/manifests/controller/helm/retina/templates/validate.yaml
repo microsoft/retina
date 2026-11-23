@@ -37,6 +37,18 @@
   {{- end }}
 {{- end }}
 
+{{/* validate operator flags have matching RBAC */}}
+{{- if .Values.operator.enabled }}
+  {{- range $arg := .Values.operator.container.args }}
+    {{- if and (hasPrefix "--reuse-operator-identities" (toString $arg)) (not (hasSuffix "=false" (toString $arg))) (not $.Values.operator.reuseOperatorIdentities.enabled) }}
+      {{ fail "Operator arg --reuse-operator-identities requires .Values.operator.reuseOperatorIdentities.enabled=true" }}
+    {{- end }}
+    {{- if and (hasPrefix "--windows-only-endpoints" (toString $arg)) (not (hasSuffix "=false" (toString $arg))) (not $.Values.operator.windowsOnlyEndpoints.enabled) }}
+      {{ fail "Operator arg --windows-only-endpoints requires .Values.operator.windowsOnlyEndpoints.enabled=true" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{- if .Values.externalWorkloads.enabled }}
   {{- if ne .Values.identityAllocationMode "crd" }}
     {{ fail (printf "External workloads support cannot be enabled in combination with .Values.identityAllocationMode=%s" .Values.identityAllocationMode ) }}

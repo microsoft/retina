@@ -107,7 +107,7 @@ The Retina operator uses the Lease `retina-operator-resource-lock` for leader el
 * `kube-system/cilium-config` sets `identity-management-mode: operator`.
 * `kube-system/cilium-config` does not set `label-prefix-file`. A label prefix file is not supported, because identity labels would not match cilium-operator's.
 * If `kube-system/cilium-config` sets `labels`, it is a valid label filter. The operator uses the same `labels` and `cluster-name` values (default `default`) as cilium-operator to compute identity labels.
-* The Retina operator can read `kube-system/cilium-config`. The chart grants this with the `retina-operator-cilium-config` Role and RoleBinding.
+* The Retina operator can read `kube-system/cilium-config`. Set `operator.reuseOperatorIdentities.enabled=true` and the chart creates the `retina-operator-cilium-config` Role and RoleBinding in `kube-system` for this. They are only created when that value is enabled.
 
 To check the Cilium settings:
 
@@ -126,6 +126,10 @@ For a new installation, create `windows-cilium-values.yaml`:
 
 ```yaml
 operator:
+  windowsOnlyEndpoints:
+    enabled: true
+  reuseOperatorIdentities:
+    enabled: true
   container:
     args:
       - "manage-cilium-crds"
@@ -135,9 +139,11 @@ operator:
       - "--reuse-operator-identities=true"
 ```
 
+The `enabled` values grant the RBAC that each flag needs: read access to nodes for `--windows-only-endpoints`, and read access to the `cilium-config` ConfigMap for `--reuse-operator-identities`. The chart fails to render if a flag is set in `operator.container.args` without its matching `enabled` value.
+
 Pass it to the install command from [Hubble Control Plane](./01-Setup.md#hubble-control-plane) by adding `-f windows-cilium-values.yaml`.
 
-For an existing installation, keep the current release values. The installed chart and operator image must be Retina v1.3.4 or later, the first release that includes these flags. `--reuse-values` keeps the installed `operator.tag`, and the RBAC rules for these flags come from the chart. If the release is older, upgrade the chart and the image tags to v1.3.4 or later first, as in [Hubble Control Plane](./01-Setup.md#hubble-control-plane). Otherwise, the operator fails to start with an unknown flag error.
+For an existing installation, keep the current release values. The installed chart and operator image must be Retina v1.3.4 or later, the first release that includes these flags. `--reuse-values` keeps the installed `operator.tag`. The RBAC rules for these flags come from the chart, but only when the matching `enabled` values are set. If the release is older, upgrade the chart and the image tags to v1.3.4 or later first, as in [Hubble Control Plane](./01-Setup.md#hubble-control-plane). Otherwise, the operator fails to start with an unknown flag error.
 
 1. Get the current operator arguments:
 
@@ -145,9 +151,9 @@ For an existing installation, keep the current release values. The installed cha
     helm get values retina -n kube-system -a -o json | jq -r '.operator.container.args[]'
     ```
 
-2. Create `windows-cilium-values.yaml` with all of those arguments under `operator.container.args`, plus `--windows-only-endpoints=true` and `--reuse-operator-identities=true`.
+2. Create `windows-cilium-values.yaml` with all of those arguments under `operator.container.args`, plus `--windows-only-endpoints=true` and `--reuse-operator-identities=true`. Also set `operator.windowsOnlyEndpoints.enabled=true` and `operator.reuseOperatorIdentities.enabled=true`, as in the example above.
 
-3. Upgrade the release. `--reuse-values` keeps the other values set earlier, and `-f` replaces only the argument list:
+3. Upgrade the release. `--reuse-values` keeps the other values set earlier, and `-f` replaces the argument list and sets the `enabled` values:
 
     ```shell
     VERSION=$(helm get metadata retina -n kube-system -o json | jq -r .version)
@@ -158,7 +164,7 @@ For an existing installation, keep the current release values. The installed cha
         -f windows-cilium-values.yaml
     ```
 
-To disable the feature, update `windows-cilium-values.yaml` so it has the full operator argument list without the two flags, and run the same `helm upgrade --reuse-values -f windows-cilium-values.yaml` command. Running `helm upgrade --reuse-values` without the file keeps both flags.
+To disable the feature, update `windows-cilium-values.yaml` so it has the full operator argument list without the two flags and with both `enabled` values set to `false`, and run the same `helm upgrade --reuse-values -f windows-cilium-values.yaml` command. Running `helm upgrade --reuse-values` without the file keeps both flags.
 
 Without these flags, the Retina operator goes back to its default mode. It creates CiliumEndpoints for all Pods, including Linux Pods that Cilium manages, and allocates its own identities instead of reusing cilium-operator identities. This is not a neutral rollback. Don't use the default mode in a cluster where Cilium manages Linux endpoints.
 

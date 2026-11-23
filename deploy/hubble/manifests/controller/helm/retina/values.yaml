@@ -30,6 +30,14 @@ operator:
       - "manage-cilium-crds"
       - "--config-dir"
       - "/retina"
+  # RBAC for the --windows-only-endpoints operator flag. Enable together with passing the flag in operator.container.args.
+  windowsOnlyEndpoints:
+    # -- Grant the operator read access to nodes.
+    enabled: false
+  # RBAC for the --reuse-operator-identities operator flag. Enable together with passing the flag in operator.container.args.
+  reuseOperatorIdentities:
+    # -- Grant the operator read access to the kube-system/cilium-config ConfigMap.
+    enabled: false
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []
