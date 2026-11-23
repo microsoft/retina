@@ -1500,7 +1500,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 								RunAsUser: &rootUser,
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{
-										"NET_ADMIN", "SYS_ADMIN",
+										"NET_ADMIN", "SYS_ADMIN", "NET_RAW",
 									},
 								},
 							},
@@ -2493,7 +2493,7 @@ func Test_CaptureToPodTranslator_TranslateCaptureToJobs(t *testing.T) {
 				job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{
-							"NET_ADMIN", "SYS_ADMIN",
+							"NET_ADMIN", "SYS_ADMIN", "NET_RAW",
 						},
 					},
 					WindowsOptions: &corev1.WindowsSecurityContextOptions{

@@ -34,7 +34,7 @@ Capture Jobs run their Pods with elevated settings in order to capture host traf
 
 - **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
 - **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
-- **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
+- **`NET_ADMIN`, `SYS_ADMIN` and `NET_RAW` Linux capabilities** - required to run the packet capture on the host's interfaces.
 - **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, either allow-list this image/registry, or mirror the image into your approved registry and override it via `RETINA_AGENT_IMAGE` (see [Debug mode](#debug-mode)).
 
 If your cluster denies any of these, the capture Job's pod will fail admission and the capture will not run.
