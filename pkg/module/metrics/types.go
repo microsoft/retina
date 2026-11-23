@@ -314,6 +314,9 @@ func (c *ContextOptions) getByDirectionValues(f *flow.Flow, dest bool) []string 
 				} else {
 					values = append(values, fmt.Sprintf("%d", udp.GetSourcePort()))
 				}
+			} else {
+				// Non-TCP/UDP L4 (e.g. ICMP) has no port; keep values aligned with labels.
+				values = append(values, "unknown")
 			}
 		} else {
 			values = append(values, "unknown")

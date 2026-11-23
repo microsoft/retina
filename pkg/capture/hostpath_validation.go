@@ -6,7 +6,7 @@ package capture
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -29,10 +29,44 @@ var (
 	ErrHostPathEscapesBase = errors.New("hostPath resolves outside the configured base directory")
 	// ErrHostPathBaseDir is returned when the operator-provided base directory is not usable.
 	ErrHostPathBaseDir = errors.New("invalid hostPath base directory")
+	// ErrHostPathInvalidChars is returned when the supplied HostPath contains a
+	// character matched by UnsafePathChars.
+	ErrHostPathInvalidChars = errors.New("hostPath contains characters that are not valid in a path segment")
+	// ErrResolvedHostPathRelative is returned when a resolved on-node path is not absolute.
+	ErrResolvedHostPathRelative = errors.New("resolved hostPath must be an absolute path")
 )
 
 // winDriveLetter matches a Windows drive-letter prefix such as "C:\" or "c:/".
 var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
+
+// UnsafePathChars denylists characters that are NTFS-reserved, ASCII control
+// characters, or cmd.exe operators (& | < > ^ % ! ( ) ") that the Windows
+// download helper's cmd.exe-based existence/read commands cannot escape.
+// Everything else, including Unicode, '@', '+', and space, is a valid path
+// character and is left alone, matching the HostPath contract documented on
+// OutputConfiguration.HostPath.
+var UnsafePathChars = regexp.MustCompile(`[<>:"|?*\x00-\x1f&^%!()]`)
+
+// ValidateHostPathBaseDir ensures a configured Capture host-path base directory
+// is absolute and free of UnsafePathChars, since it is prefixed onto every
+// resolved HostPath before that value is used as a pod annotation and checked
+// again at download time by ValidateResolvedHostPath; a base dir that passed
+// only an absolute-path check (e.g. containing '&') would make every later
+// download exploitable or fail. If baseDir is empty, DefaultHostPathBaseDir is
+// used.
+func ValidateHostPathBaseDir(baseDir string) (string, error) {
+	if baseDir == "" {
+		baseDir = DefaultHostPathBaseDir
+	}
+	cleaned := path.Clean(baseDir)
+	if !path.IsAbs(cleaned) {
+		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
+	}
+	if UnsafePathChars.MatchString(cleaned) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, cleaned)
+	}
+	return cleaned, nil
+}
 
 // validateHostPath ensures that the user-supplied HostPath from a Capture CR is safe
 // to mount into the privileged capture pod and returns the absolute, cleaned path the
@@ -45,6 +79,7 @@ var winDriveLetter = regexp.MustCompile(`^[A-Za-z]:[\\/]`)
 //   - The path must not be absolute (no leading "/" or "\\", no Windows drive letter).
 //   - The path must not contain any ".." segment, checked both on the raw input and
 //     after filepath.Clean.
+//   - The path must not contain any UnsafePathChars.
 //   - As defense in depth, the joined path must still resolve under baseDir.
 //
 // If baseDir is empty, DefaultHostPathBaseDir is used.
@@ -53,22 +88,23 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		return "", ErrHostPathEmpty
 	}
 
-	if baseDir == "" {
-		baseDir = DefaultHostPathBaseDir
-	}
-	cleanedBase := filepath.Clean(baseDir)
-	if !filepath.IsAbs(cleanedBase) {
-		return "", fmt.Errorf("%w: %q must be absolute", ErrHostPathBaseDir, baseDir)
+	cleanedBase, err := ValidateHostPathBaseDir(baseDir)
+	if err != nil {
+		return "", err
 	}
 
 	// Reject absolute paths up front, in both POSIX and Windows styles, so existing
 	// CRs that supplied an absolute host path fail loudly instead of being silently
-	// rewritten by filepath.Join.
-	if filepath.IsAbs(raw) ||
+	// rewritten by path.Join.
+	if path.IsAbs(raw) ||
 		strings.HasPrefix(raw, "/") ||
 		strings.HasPrefix(raw, `\`) ||
 		winDriveLetter.MatchString(raw) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
+	}
+
+	if UnsafePathChars.MatchString(raw) {
+		return "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, raw)
 	}
 
 	// Reject literal ".." segments before cleaning so traversal attempts are
@@ -77,24 +113,63 @@ func validateHostPath(raw, baseDir string) (string, error) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
-	cleanedSub := filepath.Clean(raw)
+	cleanedSub := path.Clean(raw)
 	if cleanedSub == "." || cleanedSub == "" {
 		return "", ErrHostPathEmpty
 	}
-	if filepath.IsAbs(cleanedSub) || strings.HasPrefix(cleanedSub, "/") || strings.HasPrefix(cleanedSub, `\`) {
+	if path.IsAbs(cleanedSub) || strings.HasPrefix(cleanedSub, "/") || strings.HasPrefix(cleanedSub, `\`) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathAbsolute, raw)
 	}
 	if containsParentSegment(cleanedSub) {
 		return "", fmt.Errorf("%w: %q", ErrHostPathTraversal, raw)
 	}
 
-	joined := filepath.Clean(filepath.Join(cleanedBase, cleanedSub))
-	rel, err := filepath.Rel(cleanedBase, joined)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	joined := path.Clean(path.Join(cleanedBase, cleanedSub))
+	if cleanedBase != "/" && joined != cleanedBase && !strings.HasPrefix(joined, cleanedBase+"/") {
 		return "", fmt.Errorf("%w: %q resolves to %q (base %q)", ErrHostPathEscapesBase, raw, joined, cleanedBase)
 	}
 
 	return joined, nil
+}
+
+// ValidateResolvedHostPath checks a resolved on-node capture path, such as the
+// value of a capture pod's host-path annotation, and returns it cleaned. Pod
+// annotations can be set by anyone allowed to create Pods, so the value is not
+// trusted. Rules:
+//
+//   - The path must be non-empty, absolute (leading "/") and free of UnsafePathChars.
+//   - The path must not contain any ".." segment, with "/" or "\" as separators
+//     (both are separators on Windows nodes).
+//   - The cleaned path must be baseDir or lie under it.
+//
+// It returns the cleaned base directory and the cleaned path relative to it ("" when p is the base directory itself).
+// If baseDir is empty, DefaultHostPathBaseDir is used.
+func ValidateResolvedHostPath(p, baseDir string) (cleanedBase, relPath string, err error) {
+	if p == "" {
+		return "", "", ErrHostPathEmpty
+	}
+
+	cleanedBase, err = ValidateHostPathBaseDir(baseDir)
+	if err != nil {
+		return "", "", err
+	}
+
+	if UnsafePathChars.MatchString(p) {
+		return "", "", fmt.Errorf("%w: %q", ErrHostPathInvalidChars, p)
+	}
+	if !strings.HasPrefix(p, "/") {
+		return "", "", fmt.Errorf("%w: %q", ErrResolvedHostPathRelative, p)
+	}
+	if containsParentSegment(p) {
+		return "", "", fmt.Errorf("%w: %q", ErrHostPathTraversal, p)
+	}
+
+	cleaned := path.Clean(p)
+	if cleanedBase != "/" && cleaned != cleanedBase && !strings.HasPrefix(cleaned, cleanedBase+"/") {
+		return "", "", fmt.Errorf("%w: %q (base %q)", ErrHostPathEscapesBase, p, cleanedBase)
+	}
+
+	return cleanedBase, strings.TrimPrefix(strings.TrimPrefix(cleaned, cleanedBase), "/"), nil
 }
 
 // containsParentSegment returns true if any path segment of p (split on either

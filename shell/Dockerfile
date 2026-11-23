@@ -1,9 +1,45 @@
-# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20260728@sha256:4ecd6b297db85c54ec2df07145a28536c3655a3e98e54eb2364189bc4e6eac23
+# pwru is built from a pinned source commit with this repo's Go builder, so
+# its standard library tracks the golang base image instead of the upstream
+# release cadence. Upstream publishes binaries only on tags.
+# skopeo inspect docker://mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.26-azurelinux3.0@sha256:4b01bf2cc3d952f3f34d46a8b11fbfbe48cd4f06e2f1629b26a749ee4500e68b AS pwru-build
+RUN tdnf install -y make git clang llvm gcc glibc-static gawk file flex bison tar diffutils
+# https://github.com/cilium/pwru/releases/tag/v1.0.12
+ARG PWRU_COMMIT=f1d6cf8898953ac1560401e181f3ac5f0e33b486
+RUN git clone https://github.com/cilium/pwru /pwru && git -C /pwru checkout "$PWRU_COMMIT"
+WORKDIR /pwru
+# pwru's pinned commit still resolves golang.org/x/net v0.57.0, which is
+# affected by CVE-2026-78669 and CVE-2026-78661. Bump it in pwru's own module before building;
+# the retina modules are already on a fixed version via the root go.mod.
+# pwru vendors its dependencies, so the vendor tree must be regenerated to
+# stay consistent with the updated go.mod.
+RUN GOFLAGS=-mod=mod go get golang.org/x/net@v0.62.0 \
+    && GOFLAGS=-mod=mod go mod vendor
+ARG GOARCH=amd64
+RUN set -eux; \
+    case "$GOARCH" in \
+        amd64) LIBPCAP_ARCH="x86_64-unknown-linux-gnu" ;; \
+        arm64) LIBPCAP_ARCH="aarch64-unknown-linux-gnu" ;; \
+        *) echo "Unsupported arch: $GOARCH" && exit 1 ;; \
+    esac; \
+    # GOEXPERIMENT=none disables the Microsoft Go OpenSSL crypto backend,
+    # which dlopens libcrypto at startup and crashes inside a statically
+    # linked binary. pwru does not need FIPS crypto.
+    # CC=clang: the ADO pipeline builds arm64 under QEMU, and gcc cc1
+    # crashes there with an internal compiler error. clang does not.
+    GOEXPERIMENT=none CC=clang make TARGET_GOARCH="$GOARCH" LIBPCAP_ARCH="$LIBPCAP_ARCH"; \
+    file pwru | grep -q 'ELF'; \
+    # the binary must start; a broken crypto backend or link crashes here
+    ./pwru --version
 
+# skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880
+
+# Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
 	bind-utils \
 	conntrack \
+	cri-tools \
 	curl \
 	ebtables-legacy \
 	ethtool \
@@ -13,24 +49,33 @@ RUN tdnf install -y \
 	iptables \
 	iputils \
 	jq \
+	krb5-1.21.3-6.azl3 \
 	ldns-utils \
 	less \
+	nano \
 	net-tools \
 	nftables \
 	nmap \
 	nmap-ncat \
 	openssh \
+	pcre2-10.48-1.azl3 \
+	popt-1.19-2.azl3 \
 	procps-ng \
 	sysstat \
 	socat \
 	tcpdump \
 	wget \
+	zlib-1.3.2-2.azl3 \
 	tar \
 	file \
 	bpftool \
 	bpftrace \
 	ig \
-	&& tdnf clean all
+	&& tdnf clean all \
+	# cri-tools also installs critest, a CRI conformance suite binary as large
+	# as crictl itself and with no use in a debug shell. Remove it in the same
+	# layer so the image does not store it.
+	&& rm /usr/bin/critest
 
 # Create the entrypoint script to mount debugfs and tracefs
 SHELL ["/bin/bash", "-c"]
@@ -49,29 +94,23 @@ ENV HOST_ROOT=/host
 
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Point crictl at the containerd socket, which is exposed under /run when the
+# shell is started with --mount-host-filesystem. Override with
+# `crictl --runtime-endpoint` on clusters running a different CRI implementation.
+RUN echo $'runtime-endpoint: unix:///run/containerd/containerd.sock\n\
+image-endpoint: unix:///run/containerd/containerd.sock\n\
+timeout: 10' > /etc/crictl.yaml
+
+# crictl logs opens the kubelet's log files at /var/log/pods itself; the CRI
+# API does not stream log content. The files exist only on the host, so
+# resolve the path through the read-only /host mount. The link dangles
+# harmlessly when --mount-host-filesystem is not set.
+RUN ln -s /host/var/log/pods /var/log/pods
+
 # Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Re-use existing arg from Makefile target "container-docker"
-# https://github.com/microsoft/retina/blob/main/Makefile#L224
-ARG GOARCH=amd64
-ENV ARCH=${GOARCH}
-# https://github.com/cilium/pwru/releases
-ARG PWRU_TAG="v1.0.12"
-ENV PWRU_TAG=${PWRU_TAG}
-
-# Download and extract latest pwru release for the correct architecture (amd64 or arm64)
-RUN set -eux; \
-    case "$ARCH" in \
-        amd64|x86_64) PWRU_ARCH="amd64" ;; \
-        arm64|aarch64) PWRU_ARCH="arm64" ;; \
-        *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-    esac; \
-    PWRU_TAR="pwru-linux-${PWRU_ARCH}.tar.gz"; \
-    curl -fL -o /tmp/pwru.tar.gz "https://github.com/cilium/pwru/releases/download/${PWRU_TAG}/${PWRU_TAR}"; \
-    tar -xz -C /usr/local/bin -f /tmp/pwru.tar.gz pwru; \
-    chmod +x /usr/local/bin/pwru; \
-    rm /tmp/pwru.tar.gz; \
-    file /usr/local/bin/pwru | grep -q 'ELF'
+COPY --from=pwru-build /pwru/pwru /usr/local/bin/pwru
+RUN file /usr/local/bin/pwru | grep -q 'ELF' && /usr/local/bin/pwru --version
 
 CMD ["/bin/bash", "-l"]

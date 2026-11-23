@@ -9,6 +9,44 @@ See the [overview](./01-overview.md#capture-jobs) for a description of how the c
 ## Prerequisites
 
 - [Install Retina](../02-Installation/01-Setup.md#capture-support) **with capture support**.
+- Sufficient node storage for capture files when using the default host-path output, unless a remote output location (blob, S3, or PVC) is configured instead.
+
+### Cluster Access
+
+Unlike the [CLI](./02-cli.md#cluster-access), the CRD flow doesn't require your own user/context to hold Job/Secret/Pod permissions — the Retina **operator's** ServiceAccount (granted via its Helm chart `ClusterRole`) creates and manages the underlying Jobs, Secrets, and Pods on your behalf. You only need permission to manage the CRD itself in the target namespace:
+
+| Resource | Verbs | Scope |
+|---|---|---|
+| `captures.retina.sh` | `create`, `get`, `list`, `delete` | namespace |
+
+This is enough for Captures that target Pods in the Capture's own namespace (`podSelector` or `podNames`). Two targets reach beyond that namespace and need an extra, **cluster-scoped** permission:
+
+| Target | What it captures | Extra verb on `captures.retina.sh` | ClusterRole installed by the chart |
+|---|---|---|---|
+| `captureTarget.nodeSelector` | All traffic on the selected nodes, from every namespace | `capture-nodes` | `retina-operator-capture-nodes` |
+| `captureTarget.namespaceSelector` | Pods in other namespaces | `capture-namespaces` | `retina-operator-capture-namespaces` |
+
+The chart enforces this with a `ValidatingAdmissionPolicy` (Kubernetes 1.30 or later). It checks the verb when a Capture is created, and again whenever the `spec` of a Capture using one of these targets changes (labels, annotations and status updates aren't re-checked). The verb only counts when it's granted cluster-wide, through a `ClusterRoleBinding`; a `RoleBinding` in the Capture's namespace is not enough. Cluster admins (and any role with `verbs: ["*"]` on `captures.retina.sh` cluster-wide) already hold both verbs. To grant node-wide captures to a user:
+
+```shell
+kubectl create clusterrolebinding alice-capture-nodes \
+    --clusterrole=retina-operator-capture-nodes --user=alice
+```
+
+The ClusterRole names use the `operator.name` Helm value as prefix (`retina-operator` by default). To install without the policy, for example on clusters older than 1.30, set `capture.admissionPolicy.enabled=false`; `nodeSelector` and `namespaceSelector` are then not restricted by RBAC.
+
+When rendering the chart offline with `helm template`, pass your cluster's version with `--kube-version` (for example `--kube-version 1.31.0`). Without it, Helm assumes the Kubernetes version it was built against, which is older than 1.30 for Helm 3.14 and earlier, and the policy's version check fails.
+
+### Cluster Admission Policies
+
+The operator translates each `Capture` into the same underlying Job/Pod spec used by the CLI, so the same elevated Pod settings are required. If the cluster enforces restrictive admission policies (e.g. Azure Policy, Gatekeeper, Kyverno), the capture namespace/workload must be allowed to use:
+
+- **Host network** (`hostNetwork: true`) - required so the capture pod can see the node's network interfaces.
+- **Host IPC** (`hostIPC: true`) - required by the underlying capture tooling.
+- **`NET_ADMIN` and `SYS_ADMIN` Linux capabilities** - required to run the packet capture on the host's interfaces.
+- **The capture image's registry** - the default capture image is pulled from `ghcr.io/microsoft/retina/retina-agent`. If the cluster restricts pulls to an approved registry, allow-list this image/registry or mirror it into your approved registry.
+
+If your cluster denies any of these, the capture Job's pod will fail admission — check `kubectl get capture <capture-crd-name> -o yaml` for job status, and the pod events in the target namespace for the denial reason.
 
 ## Usage
 

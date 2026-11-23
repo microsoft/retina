@@ -18,8 +18,11 @@ updates:
       prefix: "deps"
     labels: ["area/infra", "area/dependencies"]
     open-pull-requests-limit: 10
+    # MCR rebuilds these base images to ship CVE fixes, so a long window
+    # delays the patches. A tag that is rebuilt more often than the window
+    # never becomes eligible.
     cooldown:
-      default-days: 7
+      default-days: 2
     groups:
       golang-base:
         patterns: ["*golang*"]
@@ -85,6 +88,12 @@ updates:
     cooldown:
       default-days: 7
       semver-major-days: 30
+    allow:
+      - dependency-type: "direct"
+      # go.mod marks tool dependencies as indirect, and Dependabot skips
+      # indirect dependencies unless an entry allows them by name.
+      - dependency-name: "sigs.k8s.io/kind"
+        dependency-type: "all"
     ignore:
       # hive/statedb/stream versions are pinned by cilium/cilium's go.mod;
       # they can only move when cilium/cilium moves.
@@ -96,7 +105,7 @@ updates:
         patterns:
           - "k8s.io/*"
           - "sigs.k8s.io/*"
-          - "helm.sh/helm/v3"
+          - "helm.sh/helm/v4"
           - "sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader"
         exclude-patterns:
           - "sigs.k8s.io/cloud-provider-azure/pkg/azclient"

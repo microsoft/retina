@@ -8,10 +8,12 @@ import (
 	"os"
 	"time"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	helmValues "helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/cli"
+	helmValues "helm.sh/helm/v4/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/kube"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 )
 
 const upgradeTimeout = 300 * time.Second // longer timeout to accommodate slow windows node terminating and restarting.
@@ -30,15 +32,19 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	settings.KubeConfig = u.KubeConfigFilePath
 	actionConfig := new(action.Configuration)
 
-	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, os.Getenv("HELM_DRIVER"), log.Printf)
+	err := actionConfig.Init(settings.RESTClientGetter(), u.Namespace, os.Getenv("HELM_DRIVER"))
 	if err != nil {
 		return fmt.Errorf("failed to initialize helm action config: %w", err)
 	}
 
 	client := action.NewUpgrade(actionConfig)
-	client.Wait = true
+	client.WaitStrategy = kube.StatusWatcherStrategy
 	client.WaitForJobs = true
 	client.Timeout = upgradeTimeout
+	// Reuse the values stored on the release so the install-time overrides
+	// (image registry, repository, tag) survive the upgrade; without this the
+	// chart-default images are restored and the agent reverts to an old tag.
+	client.ReuseValues = true
 
 	// Create a new Get action
 	get := action.NewGet(actionConfig)
@@ -48,9 +54,13 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to get release: %w", err)
 	}
+	current, ok := rel.(*releasev1.Release)
+	if !ok {
+		return fmt.Errorf("%w: %T", errUnexpectedReleaseType, rel)
+	}
 
 	// Get the chart from the current release
-	chart := rel.Chart
+	chart := current.Chart
 
 	// enable advanced metrics profile
 	options := helmValues.Options{
@@ -68,10 +78,14 @@ func (u *UpgradeRetinaHelmChart) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to upgrade chart: %w", err)
 	}
+	upgraded, ok := rel.(*releasev1.Release)
+	if !ok {
+		return fmt.Errorf("%w: %T", errUnexpectedReleaseType, rel)
+	}
 
-	log.Printf("upgraded chart from path: %s in namespace: %s\n", rel.Name, rel.Namespace)
+	log.Printf("upgraded chart from path: %s in namespace: %s\n", upgraded.Name, upgraded.Namespace)
 	// this will confirm the values set during installation
-	log.Printf("chart values: %v\n", rel.Config)
+	log.Printf("chart values: %v\n", upgraded.Config)
 
 	return nil
 }

@@ -53,6 +53,9 @@ var (
 	RetinaAdvancedProfilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "profiles", "advanced", "values.yaml")
 	}
+	RetinaAdvancedWithEbpfWindowsProfilePath = func(rootDir string) string {
+		return filepath.Join(rootDir, "test", "profiles", "advanced", "ebpfwindows-values.yaml")
+	}
 	KubeConfigFilePath = func(rootDir string) string {
 		return filepath.Join(rootDir, "test", "e2e", "test.pem")
 	}
@@ -72,7 +75,7 @@ func (s ScaleTestInfraHandler) GetSubscriptionID() string {
 
 func (s ScaleTestInfraHandler) GetLocation() string {
 	if s.location == "" {
-		return "westus2"
+		return "westcentralus"
 	}
 	return s.location
 }
@@ -87,8 +90,8 @@ func (s ScaleTestInfraHandler) GetResourceGroup() string {
 
 func (s ScaleTestInfraHandler) GetNodes() string {
 	if s.nodes == "" {
-		// Default to 100 nodes per pool
-		return "100"
+		// Default to 250 nodes per pool
+		return "250"
 	}
 	return s.nodes
 }

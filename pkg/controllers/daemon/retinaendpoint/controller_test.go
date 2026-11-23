@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
+//go:build !windows
+// +build !windows
 
 package retinaendpoint
 

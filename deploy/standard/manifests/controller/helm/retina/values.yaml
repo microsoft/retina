@@ -28,6 +28,8 @@ operator:
       - "--config"
       - "/retina/operator-config.yaml"
   telemetryInterval: "5m"
+  # -- Additional labels for retina-operator pods
+  podLabels: {}
   affinity:
     # TODO(user): Override the following values to configure the nodeAffinity expression
     # according to the platforms which are supported by your solution.
@@ -82,6 +84,8 @@ namespace: kube-system
 
 agent:
   name: retina-agent
+  # -- Additional labels for retina-agent pods (linux and windows)
+  podLabels: {}
 
 agent_win:
   name: retina-agent-win
@@ -185,6 +189,14 @@ capture:
   # cannot influence the base. Leave empty to use the operator default
   # (/var/log/retina/captures).
   hostPathBaseDir: ""
+  admissionPolicy:
+    # enabled installs a ValidatingAdmissionPolicy (requires Kubernetes >= 1.30)
+    # that only lets users holding the cluster-scoped 'capture-nodes' /
+    # 'capture-namespaces' verbs on captures.retina.sh create Captures with
+    # captureTarget.nodeSelector / captureTarget.namespaceSelector. Grant them by
+    # binding the <operator.name>-capture-nodes / <operator.name>-capture-namespaces
+    # ClusterRoles with a ClusterRoleBinding. Only applies when operator.enabled=true.
+    enabled: true
   # enableManagedStorageAccount toggles the use of managed storage account for storing artifacts.
   # If set to true, the following fields related to Azure credentials must be set.
   # Ref: docs/captures/managed-storage-account.md
@@ -312,7 +324,7 @@ metrics:
     tlsConfig: {}
     ## @param metrics.serviceMonitor.relabelings [array] Prometheus relabeling rules to apply to samples before scraping
     ##
-    relabelings: 
+    relabelings:
       - sourceLabels:
           [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
         separator: ":"

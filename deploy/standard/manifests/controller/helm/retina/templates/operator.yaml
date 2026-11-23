@@ -31,6 +31,9 @@ spec:
       labels:
         app: {{ .Values.operator.name }}
         control-plane: {{ .Values.operator.name }}
+        {{- with .Values.operator.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

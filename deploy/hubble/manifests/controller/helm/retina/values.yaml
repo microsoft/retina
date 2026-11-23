@@ -36,6 +36,26 @@ operator:
   # Namespace used for operator leader election lease.
   # Defaults to .Release.Namespace when empty.
   leaderElectionNamespace: ""
+  # -- Additional labels for retina-operator pods
+  podLabels: {}
+  # -- Resource requests and limits for the retina-operator container.
+  resources:
+    limits:
+      cpu: 500m
+      memory: 500Mi
+    requests:
+      cpu: 250m
+      memory: 250Mi
+  # -- retina-operator pod-level security context.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  # -- retina-operator container-level security context.
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
 agent:
   leaderElection: false
@@ -65,6 +85,8 @@ agent:
   # -- Node tolerations for pod assignment on nodes with taints
   # ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
   tolerations: []
+  # -- Additional labels for retina-agent pods
+  podLabels: {}
 
 enablePodLevel: true
 conntrackReportInterval: 30s
@@ -704,14 +726,6 @@ hubble:
 
       # -- Additional hubble-ui backend volumeMounts.
       extraVolumeMounts: []
-
-      livenessProbe:
-        # -- Enable liveness probe for Hubble-ui backend (requires Hubble-ui 0.12+)
-        enabled: false
-
-      readinessProbe:
-        # -- Enable readiness probe for Hubble-ui backend (requires Hubble-ui 0.12+)
-        enabled: false
 
       # -- Resource requests and limits for the 'backend' container of the 'hubble-ui' deployment.
       resources: {}

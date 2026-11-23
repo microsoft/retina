@@ -25,14 +25,14 @@
     "micromatch": "^4.0.8",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.8",
-    "sharp": "^0.35.3"
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.9.2",
     "@docusaurus/tsconfig": "^3.10.2",
     "@docusaurus/types": "^3.10.1",
-    "css-loader": "^7.1.4",
+    "css-loader": "^7.1.5",
     "style-loader": "^4.0.0",
     "typescript": "^7.0.2"
   },
@@ -53,7 +53,8 @@
   },
   "overrides": {
     "serialize-javascript": ">=7.0.5",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.5",
+    "tinypool": "^2.1.2",
     "uuid": "^11.1.1"
   }
 }

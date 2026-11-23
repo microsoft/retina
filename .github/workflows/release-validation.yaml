@@ -45,7 +45,7 @@ jobs:
           helm pull oci://ghcr.io/microsoft/retina/charts/retina --version ${{ env.TAG }}
 
       - name: Setup kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
 
       # krew does not support installing a specific verison
       # so if this step fails it means there was something wrong

@@ -48,7 +48,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
 				PodName:      podName,
-				Command:      "curl -s -m 5 bing.com",
+				Command:      "curl -s -m 5 www.bing.com",
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               true,
@@ -64,7 +64,7 @@ func ValidateDropMetric(namespace, arch string) *types.Scenario {
 			Step: &kubernetes.ExecInPod{
 				PodNamespace: namespace,
 				PodName:      podName,
-				Command:      "curl -s -m 5 bing.com",
+				Command:      "curl -s -m 5 www.bing.com",
 			},
 			Opts: &types.StepOptions{
 				ExpectError:               true,

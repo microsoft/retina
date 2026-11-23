@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -52,7 +53,8 @@ func (su *S3Upload) Enabled() bool {
 		return false
 	}
 
-	su.endpoint = os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Endpoint))
+	// Trimmed like in ValidateS3Endpoint, so the endpoint used is the one that was validated.
+	su.endpoint = strings.TrimSpace(os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Endpoint)))
 	su.region = os.Getenv(string(captureConstants.CaptureOutputLocationEnvKeyS3Region))
 	if su.endpoint == "" && su.region == "" {
 		su.l.Debug("Output location is not enabled because both endpoint and region are not set", zap.String("location", su.Name()))
@@ -87,6 +89,10 @@ func (su *S3Upload) Output(ctx context.Context, srcFilePath string) error {
 		zap.String("objectKey", objectKey),
 	)
 
+	if err := ValidateS3Endpoint(su.endpoint); err != nil {
+		return fmt.Errorf("refusing to upload to S3, invalid endpoint: %w", err)
+	}
+
 	s3Client, err := su.getClient(ctx)
 	if err != nil {
 		su.l.Error("Failed to get AWS client", zap.Error(err))
@@ -113,6 +119,7 @@ func (su *S3Upload) Output(ctx context.Context, srcFilePath string) error {
 			zap.String("bucketName", su.bucket),
 			zap.String("objectKey", objectKey),
 			zap.Error(wrappedErr))
+		return wrappedErr
 	}
 	return nil
 }

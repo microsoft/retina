@@ -73,7 +73,7 @@ RETINA_PLATFORM_TAG        = $(TAG)-windows-ltsc$(YEAR)-amd64
 endif
 
 qemu-user-static: ## Set up the host to run qemu multiplatform container builds.
-	sudo $(CONTAINER_RUNTIME) run --rm --privileged multiarch/qemu-user-static --reset -p yes
+	sudo $(CONTAINER_RUNTIME) run --rm --privileged tonistiigi/binfmt --install arm64
 
 .PHONY: version
 version: ## prints the root version
@@ -261,6 +261,7 @@ container-docker-windows: # util target to build Windows container images withou
 
 retina-image: ## build the retina linux container image.
 	echo "Building for $(PLATFORM)"
+	set -e; \
 	for target in $(AGENT_TARGETS); do \
 		echo "Building for $$target"; \
 		if [ "$$target" = "init" ]; then \
@@ -402,27 +403,32 @@ build-windows-binaries: ## Build Windows binaries
 
 ##@ Multiplatform
 
+# Command that creates a multi-arch index from per-platform image references.
+# The Azure DevOps pipeline has no docker CLI and passes hack/scripts/oras-index.sh.
+MANIFEST_CREATE ?= docker buildx imagetools create -t
+MANIFEST_TAG ?= $(TAG)
+
 manifest-retina-image: ## create a multiplatform manifest for the retina image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE):$(TAG))
-	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
-	docker buildx imagetools create -t $(FULL_INIT_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_IMAGE))
+	$(eval FULL_INIT_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_INIT_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64 windows-ltsc2022-amd64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
+	$(MANIFEST_CREATE) $(FULL_INIT_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_INIT_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-operator-image: ## create a multiplatform manifest for the operator image
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_OPERATOR_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest-kubectl-retina-shell-image:
-	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE):$(TAG))
-	docker buildx imagetools create -t $(FULL_IMAGE_NAME) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME)-$(subst /,-,$(platform)))
+	$(eval FULL_IMAGE_NAME=$(IMAGE_REGISTRY)/$(KUBECTL_RETINA_SHELL_IMAGE))
+	$(MANIFEST_CREATE) $(FULL_IMAGE_NAME):$(MANIFEST_TAG) $(foreach platform,linux/amd64 linux/arm64, $(FULL_IMAGE_NAME):$(TAG)-$(subst /,-,$(platform)))
 
 manifest:
 	echo "Building for $(COMPONENT)"
@@ -455,8 +461,11 @@ COVER_PKG ?= .
 
 .PHONY: test
 test: # Run unit tests.
-	go build -o test-summary ./test/utsummary/main.go
-	bash -o pipefail -c 'KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v -json ./... | ./test-summary --progress --verbose'
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use -p path)" go test -tags=unit,dashboard -skip=TestE2E* -coverprofile=coverage.out -v ./...
+
+.PHONY: test-windows
+test-windows: # Run unit tests on Windows.
+	go test -tags=unit,dashboard -skip=TestE2E* -count=1 -v ./...
 
 .PHONY: test-ebpf
 test-ebpf: # Run eBPF program tests (requires root/CAP_BPF).

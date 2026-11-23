@@ -1299,3 +1299,89 @@ func TestRingBufReaderWrapper(t *testing.T) {
 	_, err = wrapper.Read()
 	assert.ErrorIs(t, err, ringbuf.ErrClosed)
 }
+
+// readDropCounter sums the per-CPU kernel drop counter directly from the map.
+func readDropCounter(t *testing.T, m *ebpf.Map) uint64 {
+	t.Helper()
+	var perCPU []uint64
+	require.NoError(t, m.Lookup(uint32(0), &perCPU))
+	return sumPerCPUCounters(perCPU)
+}
+
+// TestKernelDropCounter_RingBuf fills the ring buffer without draining it, so
+// bpf_ringbuf_output starts failing, and asserts the eBPF drop counter records it.
+// This is the failure path the userspace reporter exports as kernel lost events.
+func TestKernelDropCounter_RingBuf(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	// RING_BUFFER_SIZE is 4096 for this variant, so the submissions below overrun it.
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+	// Deliberately do not read from the buffer; the reader only exists so the map has a
+	// consumer and is closed on cleanup.
+	_ = reader
+
+	require.Zero(t, readDropCounter(t, objs.RetinaPacketparserMetrics), "counter should start at zero")
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   net.ParseIP("10.0.99.1"),
+		DstIP:   net.ParseIP("10.0.99.2"),
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  1000,
+	})
+
+	// Each packet submits one event and nothing drains them, so the buffer fills.
+	for range 512 {
+		ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	}
+
+	dropped := readDropCounter(t, objs.RetinaPacketparserMetrics)
+	require.Positive(t, dropped, "expected the kernel drop counter to record failed submissions")
+
+	// The counter is cumulative, so further failures only increase it.
+	for range 64 {
+		ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	}
+	assert.GreaterOrEqual(t, readDropCounter(t, objs.RetinaPacketparserMetrics), dropped,
+		"counter should be monotonic")
+}
+
+// TestKernelDropCounter_Perf covers the same failure path for perf buffers, where the
+// return value of bpf_perf_event_output is handled by separate code in the C program.
+func TestKernelDropCounter_Perf(t *testing.T) {
+	objs, reader := compileAndLoadVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+	// Deliberately do not read from the buffer so submissions start failing once full.
+	_ = reader
+
+	require.Zero(t, readDropCounter(t, objs.RetinaPacketparserMetrics), "counter should start at zero")
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   net.ParseIP("10.0.98.1"),
+		DstIP:   net.ParseIP("10.0.98.2"),
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  1000,
+	})
+
+	// The perf reader is sized at 4 pages, so this overruns it.
+	for range 4096 {
+		ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	}
+
+	assert.Positive(t, readDropCounter(t, objs.RetinaPacketparserMetrics),
+		"expected the kernel drop counter to record failed perf submissions")
+}

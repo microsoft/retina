@@ -193,11 +193,14 @@ type CaptureTarget struct {
 
 	// This is a label selector which selects Pods. This field follows standard label
 	// selector semantics.
+	// If NamespaceSelector is not set, the search for matching Pods is scoped to the
+	// Capture resource's own namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty"`
 
 	// PodNames allows selecting specific pods by their names.
-	// If specified, the capture will be performed on the pods with matching names in the specified namespace.
+	// If specified, the capture will be performed on the pods with matching names in the
+	// Capture resource's own namespace.
 	// PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
 	// +optional
 	PodNames []string `json:"podNames,omitempty"`
@@ -225,6 +228,8 @@ type CaptureConfiguration struct {
 	// - IP neighbor status
 	// - IPtables rule dumps
 	// - Network statistics information
+	// The metadata describes the whole node, so it is only collected for node targets (nodeSelector) and
+	// is skipped for Pod targets (podSelector, podNames).
 	// +optional
 	// +kubebuilder:default=true
 	IncludeMetadata bool `json:"includeMetadata"`
@@ -259,13 +264,17 @@ type OutputConfiguration struct {
 	// HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
 	// "C:\\foo") and any value containing ".." segments are rejected by the
 	// operator. CR authors cannot influence the base directory, which is
-	// controlled by the cluster operator via the operator config.
+	// controlled by the cluster operator via the operator config. HostPath must
+	// also not contain '<', '>', ':', '"', '|', '?', '*', '&', '^', '%', '!',
+	// '(', ')', or ASCII control characters.
 	// +optional
+	// +kubebuilder:validation:Pattern="^[^<>:\"|?*\\x00-\\x1f&^%!()]*$"
 	HostPath *string `json:"hostPath,omitempty"`
 	// PersistentVolumeClaim mounts the supplied PVC into the pod on `/capture` and write the capture files there.
 	// +optional
 	PersistentVolumeClaim *string `json:"persistentVolumeClaim,omitempty"`
 	// BlobUpload is a secret containing the blob SAS URL to the given blob container.
+	// The URL must use https.
 	// +optional
 	BlobUpload *string `json:"blobUpload,omitempty"`
 	// S3Upload configures the details for uploading capture files to an S3-compatible storage service.
@@ -274,7 +283,8 @@ type OutputConfiguration struct {
 }
 
 type S3Upload struct {
-	// Endpoint of S3 compatible storage service.
+	// Endpoint of S3 compatible storage service. Must use https when set; when empty, the endpoint
+	// for the region is used.
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 	// Bucket in which to store the capture.

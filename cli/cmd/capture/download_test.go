@@ -7,11 +7,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
 
+	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/label"
 	corev1 "k8s.io/api/core/v1"
@@ -27,6 +37,10 @@ const (
 	testFile     = "test-file"
 	cmdCommand   = "cmd"
 	shellCommand = "sh"
+	// testHostPathBaseDir is the base directory of the "/tmp/captures" host path used by the tests.
+	testHostPathBaseDir = "/tmp"
+	// testCustomBaseDir is a non-default host path base directory.
+	testCustomBaseDir = "/mnt/captures"
 )
 
 func NewLinuxNode(name string) *corev1.Node {
@@ -301,14 +315,15 @@ func TestGetDownloadCmd(t *testing.T) {
 				if !strings.Contains(cmd.SrcFilePath, "/host/tmp/captures/"+testCapture+".tar.gz") {
 					t.Errorf("Expected Linux source file path to match pattern, got %s", cmd.SrcFilePath)
 				}
-				if cmd.MountPath != "/host/tmp/captures" {
-					t.Errorf("Expected Linux mount path '/host/tmp/captures', got %s", cmd.MountPath)
+				if cmd.MountPath != "/host/tmp" {
+					t.Errorf("Expected Linux mount path '/host/tmp', got %s", cmd.MountPath)
 				}
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != shellCommand {
 					t.Errorf("Expected Linux keep alive command to start with 'sh', got %v", cmd.KeepAliveCommand)
 				}
-				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != shellCommand {
-					t.Errorf("Expected Linux file check command to start with 'sh', got %v", cmd.FileCheckCommand)
+				wantCheckCmd := []string{"sh", "-c", linuxFileCheckScript, "sh", cmd.SrcFilePath}
+				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
+					t.Errorf("Expected Linux file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
 				}
 				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != "cat" {
 					t.Errorf("Expected Linux file read command to start with 'cat', got %v", cmd.FileReadCommand)
@@ -334,18 +349,130 @@ func TestGetDownloadCmd(t *testing.T) {
 				if !strings.Contains(cmd.SrcFilePath, "C:\\host\\tmp\\captures\\"+testCapture+".tar.gz") {
 					t.Errorf("Expected Windows source file path to match pattern, got %s", cmd.SrcFilePath)
 				}
-				if cmd.MountPath != "C:\\host\\tmp\\captures" {
-					t.Errorf("Expected Windows mount path 'C:\\host\\tmp\\captures', got %s", cmd.MountPath)
+				if cmd.MountPath != "C:\\host\\tmp" {
+					t.Errorf("Expected Windows mount path 'C:\\host\\tmp', got %s", cmd.MountPath)
 				}
 				if len(cmd.KeepAliveCommand) == 0 || cmd.KeepAliveCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows keep alive command to start with 'cmd', got %v", cmd.KeepAliveCommand)
 				}
-				if len(cmd.FileCheckCommand) == 0 || cmd.FileCheckCommand[0] != cmdCommand {
-					t.Errorf("Expected Windows file check command to start with 'cmd', got %v", cmd.FileCheckCommand)
+				wantCheckCmd := []string{"cmd", "/c", "if", "exist", cmd.SrcFilePath, "echo", fileExistsMarker}
+				if !slices.Equal(cmd.FileCheckCommand, wantCheckCmd) {
+					t.Errorf("Expected Windows file check command %v, got %v", wantCheckCmd, cmd.FileCheckCommand)
 				}
 				if len(cmd.FileReadCommand) == 0 || cmd.FileReadCommand[0] != cmdCommand {
 					t.Errorf("Expected Windows file read command to start with 'cmd', got %v", cmd.FileReadCommand)
 				}
+			},
+		},
+		{
+			name:     "hostPath with shell metacharacters is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "pwn$(id>proof.txt)",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "hostPath with cmd.exe operators is rejected regardless of node OS",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "pwn&whoami>proof.txt",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "fileName with shell metacharacters is rejected",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp/captures",
+			fileName: "pwn&whoami",
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "fileName with path traversal is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "/tmp/captures",
+			fileName: "../../escape",
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "fileName with backslash path traversal is rejected on Windows node",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp/captures",
+			fileName: `..\..\escape`,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				if !errors.Is(err, ErrUnsafeDownloadPath) {
+					t.Errorf("Expected ErrUnsafeDownloadPath, got: %v", err)
+				}
+				if cmd != nil {
+					t.Errorf("Expected nil DownloadCmd, got %v", cmd)
+				}
+			},
+		},
+		{
+			name:     "hostPath outside the base directory is rejected",
+			node:     NewLinuxNode("linux-test"),
+			hostPath: "/",
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+				require.ErrorIs(t, err, pkgcapture.ErrHostPathEscapesBase)
+				require.Nil(t, cmd)
+			},
+		},
+		{
+			name:     "hostPath with backslash traversal is rejected on Windows node",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: `/tmp/captures\..\..\Windows`,
+			fileName: testCapture,
+			wantErr:  true,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+				require.ErrorIs(t, err, pkgcapture.ErrHostPathTraversal)
+				require.Nil(t, cmd)
+			},
+		},
+		{
+			name:     "hostPath is cleaned before use",
+			node:     NewWindowsNode("windows-test"),
+			hostPath: "/tmp//captures/",
+			fileName: testCapture,
+			validate: func(t *testing.T, cmd *DownloadCmd, err error) {
+				require.NoError(t, err)
+				require.Equal(t, testHostPathBaseDir, cmd.HostPath)
+				require.Equal(t, `C:\host\tmp`, cmd.MountPath)
+				require.Equal(t, `C:\host\tmp\captures\`+testCapture+".tar.gz", cmd.SrcFilePath)
 			},
 		},
 		{
@@ -374,9 +501,188 @@ func TestGetDownloadCmd(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName)
+			result, err := getDownloadCmd(tc.node, tc.hostPath, tc.fileName, testHostPathBaseDir)
 			tc.validate(t, result, err)
 		})
+	}
+}
+
+// The download pod mounts only the host path base directory and reads the capture file through its path relative to
+// it, so a symlink planted under the base directory can't make the kubelet mount another node directory.
+func TestGetDownloadCmdMountsOnlyTheBaseDir(t *testing.T) {
+	const fileName = "cap-node-1"
+	cases := []struct {
+		name          string
+		node          *corev1.Node
+		hostPath      string
+		baseDir       string
+		wantMountPath string
+		wantSrcPath   string
+	}{
+		{
+			name:          "linux, default base",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      pkgcapture.DefaultHostPathBaseDir + "/retina",
+			baseDir:       "",
+			wantMountPath: "/host/var/log/retina/captures",
+			wantSrcPath:   "/host/var/log/retina/captures/retina/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "linux, the base directory itself",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      testCustomBaseDir,
+			baseDir:       testCustomBaseDir,
+			wantMountPath: "/host/mnt/captures",
+			wantSrcPath:   "/host/mnt/captures/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "linux, root base",
+			node:          NewLinuxNode("linux-test"),
+			hostPath:      "/a/b",
+			baseDir:       "/",
+			wantMountPath: "/host",
+			wantSrcPath:   "/host/a/b/" + fileName + ".tar.gz",
+		},
+		{
+			name:          "windows, custom base",
+			node:          NewWindowsNode("windows-test"),
+			hostPath:      "/mnt/captures/retina",
+			baseDir:       "/mnt/captures/",
+			wantMountPath: `C:\host\mnt\captures`,
+			wantSrcPath:   `C:\host\mnt\captures\retina\` + fileName + ".tar.gz",
+		},
+		{
+			name:          "windows, root base",
+			node:          NewWindowsNode("windows-test"),
+			hostPath:      "/a/b",
+			baseDir:       "/",
+			wantMountPath: `C:\host`,
+			wantSrcPath:   `C:\host\a\b\` + fileName + ".tar.gz",
+		},
+	}
+
+	for i := range cases {
+		tt := &cases[i]
+		t.Run(tt.name, func(t *testing.T) {
+			wantHostPath, err := pkgcapture.ValidateHostPathBaseDir(tt.baseDir)
+			require.NoError(t, err)
+
+			cmd, err := getDownloadCmd(tt.node, tt.hostPath, fileName, tt.baseDir)
+			require.NoError(t, err)
+			require.Equal(t, wantHostPath, cmd.HostPath)
+			require.Equal(t, tt.wantMountPath, cmd.MountPath)
+			require.Equal(t, tt.wantSrcPath, cmd.SrcFilePath)
+		})
+	}
+}
+
+// A capture created with a custom base directory downloads when the same --host-path-base-dir is passed: its path
+// passes the check and the download pod mounts that base directory, read-only.
+func TestDownloadWithCustomHostPathBaseDir(t *testing.T) {
+	ctx := context.Background()
+	kubeClient := newDownloadKubeClient([]runtime.Object{NewLinuxNode("test-node"), NewDownloadNamespace("test-namespace")})
+
+	cmd := NewDownloadSubCommand()
+	originalBaseDir := opts.hostPathBaseDir
+	t.Cleanup(func() { opts.hostPathBaseDir = originalBaseDir })
+	require.NoError(t, cmd.ParseFlags([]string{"--host-path-base-dir", testCustomBaseDir}))
+
+	// downloadFromCluster and downloadAllCaptures build their DownloadService the same way.
+	service := NewDownloadService(kubeClient, &rest.Config{}, "test-namespace", opts.hostPathBaseDir)
+	node, err := kubeClient.CoreV1().Nodes().Get(ctx, "test-node", metav1.GetOptions{})
+	require.NoError(t, err)
+
+	downloadCmd, err := getDownloadCmd(node, testCustomBaseDir+"/retina", testCapture, service.hostPathBaseDir)
+	require.NoError(t, err)
+	require.Equal(t, "/host/mnt/captures/retina/"+testCapture+".tar.gz", downloadCmd.SrcFilePath)
+
+	pod, err := service.createDownloadPod(ctx, "test-node", testCapture, downloadCmd)
+	require.NoError(t, err)
+	require.Equal(t, testCustomBaseDir, pod.Spec.Volumes[0].HostPath.Path)
+	require.True(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly)
+
+	// Without the flag, the same capture is refused before any pod is created, with a hint to pass it.
+	_, err = getDownloadCmd(node, testCustomBaseDir+"/retina", testCapture, DefaultHostPathBaseDir)
+	require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+	require.ErrorContains(t, err, "--host-path-base-dir")
+}
+
+// TestLinuxFileCheckScriptResistsInjection runs the actual linuxFileCheckScript
+// via sh -c against real files, verifying the $1 positional-parameter pattern
+// (RETINA-002) is immune to shell injection at runtime, not just that its
+// argv shape looks right.
+func TestLinuxFileCheckScriptResistsInjection(t *testing.T) {
+	shPath, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("sh not available on this system")
+	}
+
+	dir := t.TempDir()
+	existingFile := filepath.Join(dir, "exists.txt")
+	if err := os.WriteFile(existingFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	spaceFile := filepath.Join(dir, "job name.txt")
+	if err := os.WriteFile(spaceFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	unicodeFile := filepath.Join(dir, "captüre.txt")
+	if err := os.WriteFile(unicodeFile, []byte("data"), 0o600); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	proofFile := filepath.Join(dir, "pwned")
+
+	testCases := []struct {
+		name       string
+		srcPath    string
+		wantMarker bool
+	}{
+		{
+			name:       "existing readable file reports found",
+			srcPath:    existingFile,
+			wantMarker: true,
+		},
+		{
+			name:       "missing file reports not found",
+			srcPath:    filepath.Join(dir, "missing.txt"),
+			wantMarker: false,
+		},
+		{
+			name:       "path with embedded space is found",
+			srcPath:    spaceFile,
+			wantMarker: true,
+		},
+		{
+			name:       "path with unicode is found",
+			srcPath:    unicodeFile,
+			wantMarker: true,
+		},
+		{
+			name:       "shell metacharacter payload is treated as a literal filename",
+			srcPath:    filepath.Join(dir, "pwn$(touch "+proofFile+")"),
+			wantMarker: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// tc.srcPath is a fixed, test-controlled value (never user input); the
+			// point of this test is to exec it and prove it can't inject shell syntax.
+			cmd := exec.CommandContext(t.Context(), shPath, "-c", linuxFileCheckScript, "sh", tc.srcPath) // #nosec G204
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("script execution failed: %v (output: %s)", err, output)
+			}
+
+			gotMarker := strings.Contains(string(output), fileExistsMarker)
+			if gotMarker != tc.wantMarker {
+				t.Errorf("expected marker=%v, got output %q", tc.wantMarker, output)
+			}
+		})
+	}
+
+	if _, err := os.Stat(proofFile); err == nil {
+		t.Fatal("payload was executed: proof file was created, injection succeeded")
 	}
 }
 
@@ -429,7 +735,7 @@ func TestDownloadService(t *testing.T) {
 	config := &rest.Config{}
 	namespace := "test-namespace"
 
-	service := NewDownloadService(kubeClient, config, namespace)
+	service := NewDownloadService(kubeClient, config, namespace, testHostPathBaseDir)
 
 	// Test service creation
 	if service == nil {
@@ -499,6 +805,158 @@ func TestGetCapturePods(t *testing.T) {
 	}
 }
 
+var (
+	errNoSuchHost      = errors.New("dial tcp: no such host")
+	errConnectionReset = errors.New("read: connection reset by peer")
+)
+
+// failingSender fails every request the way http.Client does when no response is received (DNS, connection, TLS,
+// timeout): with a *url.Error that carries the full request URL, SAS token included.
+type failingSender struct{}
+
+func (failingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	return nil, &url.Error{Op: req.Method, URL: req.URL.String(), Err: errNoSuchHost}
+}
+
+// blobPrefix is the --name used for the blob listing; the listed blob below starts with it.
+const blobPrefix = "capture"
+
+const listBlobsResponse = `<?xml version="1.0" encoding="utf-8"?>
+<EnumerationResults ServiceEndpoint="https://retinatest.blob.core.invalid/" ContainerName="captures">
+<Prefix>capture</Prefix>
+<Blobs><Blob><Name>capture-node-1.tar.gz</Name><Properties><Content-Length>4</Content-Length><BlobType>BlockBlob</BlobType></Properties></Blob></Blobs>
+<NextMarker />
+</EnumerationResults>`
+
+// listingSender lists one blob and passes every other request to getBlob.
+type listingSender struct {
+	getBlob func(*http.Request) (*http.Response, error)
+}
+
+// listComp is the comp query value of a List Blobs request.
+const listComp = "list"
+
+func (s listingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	if req.URL.Query().Get("comp") == listComp {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/xml"}},
+			Body:       io.NopCloser(strings.NewReader(listBlobsResponse)),
+			Request:    req,
+		}, nil
+	}
+	return s.getBlob(req)
+}
+
+// failingBody fails reads the way a connection reset mid-body does, with the request URL in the error.
+type failingBody struct {
+	url string
+}
+
+func (b failingBody) Read([]byte) (int, error) {
+	return 0, &url.Error{Op: http.MethodGet, URL: b.url, Err: errConnectionReset}
+}
+
+func (failingBody) Close() error { return nil }
+
+// rejectingSender answers every request the way the storage service rejects an invalid query value: it echoes the
+// value back.
+type rejectingSender struct{}
+
+func (rejectingSender) Send(_ *storage.Client, req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Header:     http.Header{"Content-Type": []string{"application/xml"}},
+		Body: io.NopCloser(strings.NewReader(`<Error><Code>InvalidQueryParameterValue</Code><Message>invalid</Message>` +
+			`<QueryParameterName>sig</QueryParameterName><QueryParameterValue>SECRETSIGNATURE</QueryParameterValue></Error>`)),
+		Request: req,
+	}, nil
+}
+
+// The --blob-url SAS token is a credential: it must not appear in errors or logs when the download fails.
+func TestDownloadFromBlobErrorsDoNotContainSASToken(t *testing.T) {
+	const sasURL = "https://retinatest.blob.core.invalid/captures?sv=2022-11-02&sig=SECRETSIGNATURE"
+
+	cases := []struct {
+		name    string
+		blobURL string
+		sender  storage.Sender
+		wantMsg string
+		// The legacy SDK's service errors don't include the request URL.
+		noHostInError bool
+	}{
+		{
+			// No response from a server (e.g. the host doesn't resolve): the error contains the request URL.
+			name:    "listing fails before a response",
+			blobURL: sasURL,
+			sender:  failingSender{},
+			wantMsg: "failed to list blobstore",
+		},
+		{
+			name:    "URL fails to parse",
+			blobURL: "https://retinatest.blob.core.invalid/captures/%zz?sv=2022-11-02&sig=SECRETSIGNATURE",
+			sender:  failingSender{},
+			wantMsg: "failed to parse SAS URL",
+		},
+		{
+			name:          "listing is rejected for a query value",
+			blobURL:       sasURL,
+			sender:        rejectingSender{},
+			wantMsg:       "QueryParameterValue=REDACTED",
+			noHostInError: true,
+		},
+		{
+			name:    "reading the blob fails before a response",
+			blobURL: sasURL,
+			sender: listingSender{getBlob: func(req *http.Request) (*http.Response, error) {
+				return failingSender{}.Send(nil, req)
+			}},
+			wantMsg: "failed to read from blobstore",
+		},
+		{
+			name:    "reading the blob body fails",
+			blobURL: sasURL,
+			sender: listingSender{getBlob: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{},
+					Body:       failingBody{url: req.URL.String()},
+					Request:    req,
+				}, nil
+			}},
+			wantMsg: "failed to obtain blob from blobstore",
+		},
+	}
+
+	for i := range cases {
+		tt := &cases[i]
+		t.Run(tt.name, func(t *testing.T) {
+			logs := observeLogs(t)
+			originalBlobURL, originalName := blobURL, opts.Name
+			name := blobPrefix
+			blobURL, opts.Name = tt.blobURL, &name
+			t.Cleanup(func() { blobURL, opts.Name = originalBlobURL, originalName })
+			originalOutputPath := outputPath
+			outputPath = t.TempDir()
+			t.Cleanup(func() { outputPath = originalOutputPath })
+			blobStorageSender = tt.sender
+			t.Cleanup(func() { blobStorageSender = nil })
+
+			err := downloadFromBlob()
+			require.ErrorContains(t, err, tt.wantMsg)
+			require.NotContains(t, err.Error(), "SECRETSIGNATURE")
+			if !tt.noHostInError {
+				require.Contains(t, err.Error(), "retinatest.blob.core.invalid", "the error should still name the host")
+			}
+
+			require.NotZero(t, logs.Len(), "the failure must still be logged")
+			for _, entry := range logs.All() {
+				require.NotContains(t, fmt.Sprint(entry.Message, entry.ContextMap()), "SECRETSIGNATURE")
+			}
+		})
+	}
+}
+
 // Mock test for blob download functionality
 func TestDownloadFromBlobValidation(t *testing.T) {
 	// Test URL parsing validation
@@ -555,16 +1013,17 @@ func TestDownloadServiceMethods(t *testing.T) {
 
 	kubeClient := newDownloadKubeClient(objects)
 	config := &rest.Config{}
-	service := NewDownloadService(kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace", testHostPathBaseDir)
 
 	t.Run("createDownloadPod creates pod correctly", func(t *testing.T) {
 		downloadCmd := &DownloadCmd{
+			HostPath:         testHostPathBaseDir,
 			ContainerImage:   "mcr.microsoft.com/azurelinux/busybox:1.36",
-			MountPath:        "/host/tmp/captures",
+			MountPath:        "/host/tmp",
 			KeepAliveCommand: []string{"sh", "-c", "echo 'Download pod ready'; sleep 3600"},
 		}
 
-		pod, err := service.createDownloadPod(ctx, "test-node", "/tmp/captures", testCapture, downloadCmd)
+		pod, err := service.createDownloadPod(ctx, "test-node", testCapture, downloadCmd)
 		if err != nil {
 			t.Fatalf("Expected no error, got: %v", err)
 		}
@@ -572,6 +1031,9 @@ func TestDownloadServiceMethods(t *testing.T) {
 		if pod == nil {
 			t.Fatal("Expected pod to be created, got nil")
 		}
+		require.Len(t, pod.Spec.Volumes, 1)
+		require.Equal(t, testHostPathBaseDir, pod.Spec.Volumes[0].HostPath.Path)
+		require.True(t, pod.Spec.Containers[0].VolumeMounts[0].ReadOnly, "the node directory must be mounted read-only")
 
 		if pod.Spec.NodeName != "test-node" {
 			t.Errorf("Expected NodeName to be 'test-node', got: %s", pod.Spec.NodeName)
@@ -624,7 +1086,19 @@ func TestDownloadServiceErrorHandling(t *testing.T) {
 	ctx := context.Background()
 	kubeClient := newDownloadKubeClient(nil)
 	config := &rest.Config{}
-	service := NewDownloadService(kubeClient, config, "test-namespace")
+	service := NewDownloadService(kubeClient, config, "test-namespace", testHostPathBaseDir)
+
+	t.Run("DownloadFile rejects a hostPath outside the base directory before creating a pod", func(t *testing.T) {
+		_, err := service.kubeClient.CoreV1().Nodes().Create(ctx, NewLinuxNode("linux-node"), metav1.CreateOptions{})
+		require.NoError(t, err)
+
+		err = service.DownloadFile(ctx, "linux-node", "/", testFile, testCapture)
+		require.ErrorIs(t, err, ErrUnsafeDownloadPath)
+
+		pods, err := service.kubeClient.CoreV1().Pods("test-namespace").List(ctx, metav1.ListOptions{})
+		require.NoError(t, err)
+		require.Empty(t, pods.Items, "no download pod may be created for a rejected hostPath")
+	})
 
 	t.Run("DownloadFile handles unsupported node OS", func(t *testing.T) {
 		// Create a node with unsupported OS

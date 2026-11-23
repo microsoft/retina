@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -82,21 +83,24 @@ func ExecPod(ctx context.Context, clientset *kubernetes.Clientset, config *rest.
 		scheme.ParameterCodec,
 	)
 
-	var buf bytes.Buffer
+	// The executor copies stdout and stderr in two goroutines, and a
+	// bytes.Buffer is not safe for concurrent use. So each stream gets its own
+	// buffer, and the output is stdout followed by stderr.
+	var stdout, stderr bytes.Buffer
 	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
-		return buf.Bytes(), fmt.Errorf("error creating executor: %w", err)
+		return nil, fmt.Errorf("error creating executor: %w", err)
 	}
 
 	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  os.Stdin,
-		Stdout: &buf,
-		Stderr: &buf,
+		Stdout: &stdout,
+		Stderr: &stderr,
 	})
+	res := slices.Concat(stdout.Bytes(), stderr.Bytes())
 	if err != nil {
-		return buf.Bytes(), fmt.Errorf("error executing command: %w", err)
+		return res, fmt.Errorf("error executing command: %w", err)
 	}
 
-	res := buf.Bytes()
 	return res, nil
 }

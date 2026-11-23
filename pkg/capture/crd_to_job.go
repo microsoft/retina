@@ -23,6 +23,7 @@ import (
 	retinav1alpha1 "github.com/microsoft/retina/crd/api/v1alpha1"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
+	"github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
 	"github.com/microsoft/retina/pkg/label"
@@ -44,6 +45,16 @@ var (
 	errPodNamesIncompat         = errors.New("PodNames is not compatible with NamespaceSelector or PodSelector, please use one or the other")
 	errFileCountRequiresMaxSize = errors.New("fileCount requires maxCaptureSize to be set as per-file size limit")
 	errInvalidIPAddress         = errors.New("is not a valid IP address")
+	errEmptyCaptureNamespace    = errors.New("capture namespace must not be empty when resolving pod selector or pod names targets")
+	// errHostNetworkPodTargets is returned when podSelector/podNames select only hostNetwork Pods. Their IP is the
+	// node's IP, so capturing them would capture the node's own traffic; that requires nodeSelector instead.
+	errHostNetworkPodTargets = errors.New("hostNetwork Pods share the node's IP and can't be targeted by podSelector or podNames; use nodeSelector to capture node traffic")
+	// errPodTargetsNotRunning is returned when podSelector/podNames select only Pods that are not scheduled, have no
+	// IP address yet, or have completed. Without a current Pod IP, the capture filter can't be restricted to the Pod.
+	errPodTargetsNotRunning = errors.New("the selected Pods are not running or have no IP address (not scheduled, not started, or completed); target running Pods")
+	// errPodTargetWithoutIPs guards renderJob: a Pod target must always carry the Pod IPs that restrict its filter.
+	errPodTargetWithoutIPs = errors.New("refusing to render a Pod capture target without Pod IP addresses")
+	errNoNamespacesMatch   = errors.New("no namespaces match the namespace selector")
 	// errTcpdumpFilterIncompatibleWithSourceDestIPs: obtainAndValidateUserFilter gives the generated pcapFilter
 	// precedence over the deprecated tcpdumpFilter, so combining them would silently drop the tcpdumpFilter.
 	errTcpdumpFilterIncompatibleWithSourceDestIPs = errors.New("tcpdumpFilter (deprecated) cannot be combined with sourceIPs/destinationIPs; use pcapFilter instead")
@@ -284,6 +295,14 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 			translator.l.Error("Failed to get secrets for Capture", zap.Error(err), zap.String("CaptureName", capture.Name), zap.String("secretName", *capture.Spec.OutputConfiguration.BlobUpload))
 			return err
 		}
+		blobURL, ok := secret.Data[captureConstants.CaptureOutputLocationBlobUploadSecretKey]
+		if !ok {
+			return fmt.Errorf("blob upload secret %s/%s: %w: missing key %q", capture.Namespace, secret.Name,
+				outputlocation.ErrInvalidUploadDestination, captureConstants.CaptureOutputLocationBlobUploadSecretKey)
+		}
+		if validateErr := outputlocation.ValidateBlobUploadURL(string(blobURL)); validateErr != nil {
+			return fmt.Errorf("blob upload secret %s/%s: %w", capture.Namespace, secret.Name, validateErr)
+		}
 
 		secretVolume := corev1.Volume{
 			Name: *capture.Spec.OutputConfiguration.BlobUpload,
@@ -442,6 +461,17 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 	if len(*captureTargetOnNode) == 0 {
 		return nil, fmt.Errorf("no nodes are selected")
 	}
+	// Without Pod IPs, a Pod target's filter would not be restricted to the Pods and would capture the whole node.
+	podTargets := false
+	for nodeName, target := range *captureTargetOnNode {
+		if !target.CaptureNodeInterface && len(target.PodIpAddresses) == 0 {
+			return nil, fmt.Errorf("%w: node %q", errPodTargetWithoutIPs, nodeName)
+		}
+		podTargets = podTargets || !target.CaptureNodeInterface
+	}
+	if podTargets && envCommon[captureConstants.IncludeMetadataEnvKey] == strconv.FormatBool(true) {
+		translator.l.Info("Network metadata is node-wide and is only collected for node captures; skipping it for Pod targets. Use nodeSelector to collect it.")
+	}
 
 	stringTimestamp := translator.jobTemplate.Spec.Template.ObjectMeta.Annotations[captureConstants.CaptureTimestampAnnotationKey]
 	captureTimestamp, err := file.StringToTime(stringTimestamp)
@@ -458,6 +488,11 @@ func (translator *CaptureToPodTranslator) renderJob(captureTargetOnNode *Capture
 		jobEnv := make(map[string]string, len(envCommon))
 		for k, v := range envCommon {
 			jobEnv[k] = v
+		}
+		// Network metadata (routes, iptables, sockets, /proc/net on Linux; the collectlogs.ps1 bundle on Windows)
+		// describes the whole node, not just the target Pods, so it's only collected for node targets.
+		if !target.CaptureNodeInterface {
+			jobEnv[captureConstants.IncludeMetadataEnvKey] = strconv.FormatBool(false)
 		}
 		job := translator.jobTemplate.DeepCopy()
 		captureFilename := &file.CaptureFilename{
@@ -602,7 +637,9 @@ func updateTcpdumpFilterWithPodIPAddress(podIPAddresses []string, tcpdumpFilter 
 	if len(tcpdumpFilter) == 0 {
 		return filterGroup
 	}
-	return fmt.Sprintf("%s or %s", tcpdumpFilter, filterGroup)
+	// The Pod IP restriction is mandatory: include/exclude filters can only narrow
+	// the capture to a subset of the target Pods' traffic, never widen it.
+	return fmt.Sprintf("(%s) and %s", tcpdumpFilter, filterGroup)
 }
 
 func getNetshFilterWithPodIPAddress(podIPAddresses []string) string {
@@ -699,6 +736,12 @@ func (translator *CaptureToPodTranslator) validateCapture(capture *retinav1alpha
 		return err
 	}
 
+	if s3Upload := capture.Spec.OutputConfiguration.S3Upload; s3Upload != nil {
+		if err := outputlocation.ValidateS3Endpoint(s3Upload.Endpoint); err != nil {
+			return fmt.Errorf("invalid OutputConfiguration.S3Upload.Endpoint: %w", err)
+		}
+	}
+
 	if capture.Spec.CaptureConfiguration.TcpdumpFilter != nil && *capture.Spec.CaptureConfiguration.TcpdumpFilter != "" &&
 		(len(capture.Spec.CaptureConfiguration.CaptureOption.SourceIPs) > 0 || len(capture.Spec.CaptureConfiguration.CaptureOption.DestinationIPs) > 0) {
 		return errTcpdumpFilterIncompatibleWithSourceDestIPs
@@ -734,7 +777,7 @@ func (translator *CaptureToPodTranslator) getCaptureTargetsOnNode(ctx context.Co
 		}
 	}
 	if captureTarget.PodSelector != nil {
-		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget); err != nil {
+		if captureTargetsOnNode, err = translator.calculateCaptureTargetsByPodSelector(ctx, captureTarget, namespace); err != nil {
 			return nil, err
 		}
 	}
@@ -820,12 +863,17 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByNodeSelector(
 	return captureTargetOnNode, nil
 }
 
-func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget) (*CaptureTargetsOnNode, error) {
+func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
+
+	if captureTarget.NamespaceSelector == nil && namespace == "" {
+		return nil, errEmptyCaptureNamespace
+	}
+	// Without an explicit NamespaceSelector, the lookup is scoped to the Capture's own namespace only.
 	nsList := &corev1.NamespaceList{Items: []corev1.Namespace{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: corev1.NamespaceDefault,
+				Name: namespace,
 			},
 		},
 	}}
@@ -834,7 +882,7 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 		var err error
 		labelSelector, err := labels.Parse(metav1.FormatLabelSelector(captureTarget.NamespaceSelector))
 		if err != nil {
-			translator.l.Error("PersistentVolumeClaim is not empty", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
+			translator.l.Error("Failed to parse namespace selector to label", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
 		}
 		nsListOpt := metav1.ListOptions{
@@ -845,9 +893,16 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			translator.l.Error("Failed to list Namespace", zap.String("namespaceSelector", captureTarget.NamespaceSelector.String()), zap.Error(err))
 			return nil, err
 		}
+		if len(nsList.Items) == 0 {
+			return nil, fmt.Errorf("%w %q", errNoNamespacesMatch, metav1.FormatLabelSelector(captureTarget.NamespaceSelector))
+		}
 	}
 
+	targetNamespaces := make([]string, 0, len(nsList.Items))
+	selectedPods := 0
+	skipped := &skippedPodTargets{}
 	for _, ns := range nsList.Items {
+		targetNamespaces = append(targetNamespaces, ns.Name)
 		labelSelector, _ := labels.Parse(metav1.FormatLabelSelector(captureTarget.PodSelector))
 		podListOpt := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
@@ -857,44 +912,106 @@ func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodSelector(c
 			translator.l.Error("Failed to list Pod.", zap.String("podSelector", captureTarget.PodSelector.String()), zap.Error(err))
 			return nil, err
 		}
-		for _, pod := range podList.Items {
-			// TODO: Need to consider the status when pod has no ip address assigned.
-			// We want to include all the ip addresses assigned to the Pod in case the Pod is selected.
-			// This may happen when a pod is allocated with IPv4 and IPv6 addresses.
-			// And Pod.Status.PodIPs must include pod.Status.PodIP.
-			podIPs := []string{}
-			for _, podIP := range pod.Status.PodIPs {
-				podIPs = append(podIPs, podIP.IP)
-			}
-			captureTargetOnNode.AddPod(pod.Spec.NodeName, podIPs)
+		selectedPods += len(podList.Items)
+		for i := range podList.Items {
+			skipped.addPod(captureTargetOnNode, &podList.Items[i])
 		}
 	}
 
-	return captureTargetOnNode, nil
+	translator.l.Info("Resolved pod targets",
+		zap.Strings("targetNamespaces", targetNamespaces),
+		zap.Int("pods", selectedPods-len(skipped.hostNetwork)-len(skipped.notRunning)),
+		zap.Int("nodes", len(*captureTargetOnNode)),
+	)
+
+	return translator.checkSkippedPodTargets(captureTargetOnNode, skipped)
 }
 
 func (translator *CaptureToPodTranslator) calculateCaptureTargetsByPodNames(ctx context.Context, captureTarget retinav1alpha1.CaptureTarget, namespace string) (*CaptureTargetsOnNode, error) {
 	captureTargetOnNode := &CaptureTargetsOnNode{}
 
+	if namespace == "" {
+		return nil, errEmptyCaptureNamespace
+	}
+
 	// Get the pods by their names from the specified namespace
+	skipped := &skippedPodTargets{}
 	for _, podName := range captureTarget.PodNames {
 		pod, err := translator.kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
 			translator.l.Error("Failed to get Pod by name", zap.String("podName", podName), zap.String("namespace", namespace), zap.Error(err))
 			return nil, fmt.Errorf("failed to get pod %s in namespace %s: %w", podName, namespace, err)
 		}
-
-		// We want to include all the ip addresses assigned to the Pod in case the Pod is selected.
-		// This may happen when a pod is allocated with IPv4 and IPv6 addresses.
-		// And Pod.Status.PodIPs must include pod.Status.PodIP.
-		podIPs := []string{}
-		for _, podIP := range pod.Status.PodIPs {
-			podIPs = append(podIPs, podIP.IP)
-		}
-		captureTargetOnNode.AddPod(pod.Spec.NodeName, podIPs)
+		skipped.addPod(captureTargetOnNode, pod)
 	}
 
-	return captureTargetOnNode, nil
+	return translator.checkSkippedPodTargets(captureTargetOnNode, skipped)
+}
+
+// maxPodsInError caps the Pods listed in a targeting error, which ends up in the Capture's status condition message
+// (limited to 32768 characters). The full lists are logged.
+const maxPodsInError = 10
+
+// skippedPodTargets records selected Pods that can't be Pod capture targets.
+type skippedPodTargets struct {
+	// hostNetwork Pods share the node's IP, so a filter on their IP would capture the node's own traffic.
+	hostNetwork []string
+	// notRunning are Pods that aren't scheduled, have no IP yet, or have completed. A completed Pod may still report
+	// its last IP after the IP was released and reassigned to another Pod, possibly in another namespace.
+	notRunning []string
+}
+
+// addPod adds pod as a capture target on its node, unless it can't be restricted to its own traffic.
+func (s *skippedPodTargets) addPod(targets *CaptureTargetsOnNode, pod *corev1.Pod) {
+	podRef := pod.Namespace + "/" + pod.Name
+	if pod.Spec.HostNetwork {
+		s.hostNetwork = append(s.hostNetwork, podRef)
+		return
+	}
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		s.notRunning = append(s.notRunning, podRef)
+		return
+	}
+	// Include all the ip addresses assigned to the Pod, e.g. both IPv4 and IPv6 on dual-stack clusters.
+	// Pod.Status.PodIPs must include pod.Status.PodIP.
+	podIPs := make([]string, 0, len(pod.Status.PodIPs))
+	for _, podIP := range pod.Status.PodIPs {
+		podIPs = append(podIPs, podIP.IP)
+	}
+	if pod.Spec.NodeName == "" || len(podIPs) == 0 {
+		s.notRunning = append(s.notRunning, podRef)
+		return
+	}
+	targets.AddPod(pod.Spec.NodeName, podIPs)
+}
+
+// checkSkippedPodTargets reports the Pods that were excluded from Pod targets, and fails when they were the only
+// Pods selected, so the user gets an actionable error instead of a generic "no targets selected".
+func (translator *CaptureToPodTranslator) checkSkippedPodTargets(targets *CaptureTargetsOnNode, skipped *skippedPodTargets) (*CaptureTargetsOnNode, error) {
+	if len(skipped.hostNetwork) > 0 {
+		translator.l.Warn("Excluded hostNetwork Pods from capture targets", zap.Strings("pods", skipped.hostNetwork))
+	}
+	if len(skipped.notRunning) > 0 {
+		translator.l.Warn("Excluded Pods that are not running or have no IP address from capture targets", zap.Strings("pods", skipped.notRunning))
+	}
+	if len(*targets) > 0 {
+		return targets, nil
+	}
+	if len(skipped.hostNetwork) > 0 {
+		return nil, fmt.Errorf("%w: %s", errHostNetworkPodTargets, summarizePods(skipped.hostNetwork))
+	}
+	if len(skipped.notRunning) > 0 {
+		return nil, fmt.Errorf("%w: %s", errPodTargetsNotRunning, summarizePods(skipped.notRunning))
+	}
+	return targets, nil
+}
+
+// summarizePods lists at most maxPodsInError Pods, followed by how many were omitted.
+func summarizePods(pods []string) string {
+	if len(pods) <= maxPodsInError {
+		return strings.Join(pods, ", ")
+	}
+	return fmt.Sprintf("%s, and %d more", strings.Join(pods[:maxPodsInError], ", "), len(pods)-maxPodsInError)
 }
 
 // For tcpdump, we put each filter(ip:port) into parentheses, and all include filters will be grouped in parentheses,

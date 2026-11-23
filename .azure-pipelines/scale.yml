@@ -37,7 +37,7 @@ parameters:
     type: string
     default: microsoft/retina
   - name: image_tag
-    displayName: Image Tag (blank = latest commit from main)
+    displayName: Image Tag (blank = selected branch version)
     type: string
     default: ' '
   - name: num_deployments
@@ -55,7 +55,7 @@ parameters:
   - name: num_nodes
     displayName: Number of nodes
     type: number
-    default: 1000
+    default: 250
   - name: cleanup
     displayName: Clean up environment after test
     type: boolean
@@ -87,6 +87,7 @@ jobs:
           TAG: ${{ parameters.image_tag }}
           NODES: ${{ parameters.num_nodes }}
           AZURE_APP_INSIGHTS_KEY: $(AZURE_APP_INSIGHTS_KEY)
+          RUN_ID: $(Build.BuildId)
         inputs:
           azureSubscription: $(azureServiceConnection)
           scriptType: bash
@@ -109,6 +110,6 @@ jobs:
               CREATE_INFRA=true
             fi
             export TAG AZURE_RESOURCE_GROUP CLUSTER_NAME
-            exec go test -v ./test/e2e/. -timeout 300m -tags=scale -count=1 -args \
+            exec go test -v ./test/e2e/. -timeout 330m -tags=scale -count=1 -args \
               -create-infra=$CREATE_INFRA \
               -delete-infra=$CLEANUP

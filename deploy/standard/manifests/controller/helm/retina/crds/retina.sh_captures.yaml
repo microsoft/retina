@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: captures.retina.sh
 spec:
   group: retina.sh
@@ -299,7 +299,8 @@ spec:
                       podNames:
                         description: |-
                           PodNames allows selecting specific pods by their names.
-                          If specified, the capture will be performed on the pods with matching names in the specified namespace.
+                          If specified, the capture will be performed on the pods with matching names in the
+                          Capture resource's own namespace.
                           PodNames is incompatible with NodeSelector, NamespaceSelector, and PodSelector.
                         items:
                           type: string
@@ -308,6 +309,8 @@ spec:
                         description: |-
                           This is a label selector which selects Pods. This field follows standard label
                           selector semantics.
+                          If NamespaceSelector is not set, the search for matching Pods is scoped to the
+                          Capture resource's own namespace.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector
@@ -384,6 +387,8 @@ spec:
                       - IP neighbor status
                       - IPtables rule dumps
                       - Network statistics information
+                      The metadata describes the whole node, so it is only collected for node targets (nodeSelector) and
+                      is skipped for Pod targets (podSelector, podNames).
                     type: boolean
                   tcpdumpFilter:
                     description: |-
@@ -411,8 +416,9 @@ spec:
                   be stored.
                 properties:
                   blobUpload:
-                    description: BlobUpload is a secret containing the blob SAS URL
-                      to the given blob container.
+                    description: |-
+                      BlobUpload is a secret containing the blob SAS URL to the given blob container.
+                      The URL must use https.
                     type: string
                   hostPath:
                     description: |-
@@ -425,7 +431,10 @@ spec:
                       HostPath must be a relative subpath: absolute paths (e.g. "/tmp/foo",
                       "C:\\foo") and any value containing ".." segments are rejected by the
                       operator. CR authors cannot influence the base directory, which is
-                      controlled by the cluster operator via the operator config.
+                      controlled by the cluster operator via the operator config. HostPath must
+                      also not contain '<', '>', ':', '"', '|', '?', '*', '&', '^', '%', '!',
+                      '(', ')', or ASCII control characters.
+                    pattern: ^[^<>:"|?*\x00-\x1f&^%!()]*$
                     type: string
                   persistentVolumeClaim:
                     description: PersistentVolumeClaim mounts the supplied PVC into
@@ -439,7 +448,9 @@ spec:
                         description: Bucket in which to store the capture.
                         type: string
                       endpoint:
-                        description: Endpoint of S3 compatible storage service.
+                        description: |-
+                          Endpoint of S3 compatible storage service. Must use https when set; when empty, the endpoint
+                          for the region is used.
                         type: string
                       path:
                         description: Path specifies the prefix path within the S3

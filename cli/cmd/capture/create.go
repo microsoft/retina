@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -32,8 +33,10 @@ import (
 	pkgcapture "github.com/microsoft/retina/pkg/capture"
 	captureConstants "github.com/microsoft/retina/pkg/capture/constants"
 	"github.com/microsoft/retina/pkg/capture/file"
+	"github.com/microsoft/retina/pkg/capture/outputlocation"
 	captureUtils "github.com/microsoft/retina/pkg/capture/utils"
 	"github.com/microsoft/retina/pkg/config"
+	captureLabels "github.com/microsoft/retina/pkg/label"
 )
 
 const (
@@ -57,6 +60,12 @@ const (
 	DefaultS3Path          string        = "retina/captures"
 	DefaultWaitPeriod      time.Duration = 1 * time.Minute
 	DefaultWaitTimeout     time.Duration = 5 * time.Minute
+	// JobStartupTimeout is how long a no-wait capture checks whether its jobs'
+	// pods were admitted before giving up (best-effort).
+	JobStartupTimeout time.Duration = 5 * time.Second
+	// JobStartupPollPeriod is how often job status and events are polled
+	// while checking startup.
+	JobStartupPollPeriod time.Duration = 250 * time.Millisecond
 
 	// JobTTLSecondsAfterFinished is how long completed/failed jobs and their
 	// pods are kept before Kubernetes garbage-collects them (no-wait mode).
@@ -93,8 +102,12 @@ var createExample = templates.Examples(i18n.T(`
 		# (joined under the operator-configured base directory; default /var/log/retina/captures/testcapture)
 		kubectl retina capture create --host-path testcapture --node-names "<nodename1>,<nodename2>"
 
-		# Select pods determined by pod-selectors and namespace-selectors
+		# Select pods determined by pod-selectors and namespace-selectors.
+		# --namespace is where the capture Jobs run; --namespace-selectors picks the namespaces that are searched for target pods.
 		kubectl retina capture create --namespace capture --pod-selectors="k8s-app=kube-dns" --namespace-selectors="kubernetes.io/metadata.name=kube-system"
+
+		# Select pods in several namespaces that share a label (namespace selectors are labels, not namespace names)
+		kubectl retina capture create --namespace capture --pod-selectors="app=my-app" --namespace-selectors="capture-group=my-group"
 
 		# Select specific pods by name
 		kubectl retina capture create --namespace default --pod-names "pod1,pod2" --duration 30s
@@ -129,6 +142,18 @@ var createExample = templates.Examples(i18n.T(`
 			--s3-secret-access-key "your-secret-access-key"
 		`))
 
+// logTargetNamespaceSelector explains that --namespace-selectors, not --namespace, decided which namespaces were searched for target pods.
+// It logs the selector the capture actually uses, not the raw flag value, so input that is
+// normalized while parsing (for example a repeated key, where only the last value is kept) is visible.
+func logTargetNamespaceSelector(capture *retinav1alpha1.Capture) {
+	namespaceSelector := capture.Spec.CaptureConfiguration.CaptureTarget.NamespaceSelector
+	if namespaceSelector == nil {
+		return
+	}
+	retinacmd.Logger.Info(fmt.Sprintf("Target pods were selected from namespaces matching %q; --namespace only sets where the capture Jobs run",
+		metav1.FormatLabelSelector(namespaceSelector)))
+}
+
 func create(kubeClient kubernetes.Interface) error {
 	// Set namespace. If --namespace is not set, use namespace on user's context
 	ns, _, err := opts.ConfigFlags.ToRawKubeConfigLoader().Namespace()
@@ -138,6 +163,16 @@ func create(kubeClient kubernetes.Interface) error {
 
 	if opts.Namespace == nil || *opts.Namespace == "" {
 		opts.Namespace = &ns
+	}
+
+	// Fail before any secret or Job is created.
+	if opts.blobUpload != "" {
+		if validateErr := outputlocation.ValidateBlobUploadURL(opts.blobUpload); validateErr != nil {
+			return fmt.Errorf("--blob-upload: %w", validateErr)
+		}
+	}
+	if validateErr := outputlocation.ValidateS3Endpoint(opts.s3Endpoint); validateErr != nil {
+		return fmt.Errorf("--s3-endpoint: %w", validateErr)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM)
@@ -160,6 +195,9 @@ func create(kubeClient kubernetes.Interface) error {
 		return err
 	}
 
+	// Logged only once the target selection has been validated and resolved, so it never accompanies an invalid flag combination.
+	logTargetNamespaceSelector(capture)
+
 	// Set owner references on secrets so they are garbage-collected when the
 	// jobs are removed (by TTL, explicit deletion, or manual kubectl delete).
 	if ownerRefErr := setSecretOwnerReferences(ctx, kubeClient, capture, jobsCreated); ownerRefErr != nil {
@@ -167,6 +205,9 @@ func create(kubeClient kubernetes.Interface) error {
 	}
 
 	if opts.nowait {
+		if startupErr := waitForJobsToStart(ctx, kubeClient, jobsCreated); startupErr != nil {
+			return startupErr
+		}
 		if opts.cleanUpAfterUpload && hasRemoteDestination(&opts) {
 			retinacmd.Logger.Info("Capture jobs will be automatically cleaned up after upload (TTL-based)")
 		} else {
@@ -270,11 +311,13 @@ func NewCreateSubCommand(kubeClient kubernetes.Interface) *cobra.Command {
 	createCapture.Flags().StringVar(&opts.nodeNames, "node-names", "", "A comma-separated list of node names to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.nodeSelectors, "node-selectors", DefaultNodeSelectors, "A comma-separated list of node labels to select nodes on which the network capture will be performed")
 	createCapture.Flags().StringVar(&opts.podNames, "pod-names", "",
-		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (must be in the specified namespace)")
+		"A comma-separated list of pod names to select specific pods on which the network capture will be performed (looked up in the namespace set by --namespace)")
 	createCapture.Flags().StringVar(&opts.podSelectors, "pod-selectors", "",
-		"A comma-separated list of pod labels to select pods on which the network capture will be performed")
+		"A comma-separated list of pod labels (key=value, all must match) to select pods on which the network capture will be performed. "+
+			"Pods are looked up in the namespaces selected by --namespace-selectors, or in the namespace set by --namespace if it is not set")
 	createCapture.Flags().StringVar(&opts.namespaceSelectors, "namespace-selectors", "",
-		"A comma-separated list of namespace labels to filter which namespaces will be targeted for packet capture (used with --pod-selectors)")
+		"A comma-separated list of namespace labels (key=value, all must match) selecting the namespaces in which --pod-selectors are evaluated. "+
+			"These are label selectors, not namespace names. Requires --pod-selectors. When set, --namespace does not scope the target pods; it only sets where the capture Jobs run")
 	createCapture.Flags().StringVar(&opts.hostPath, "host-path", DefaultHostPath,
 		"Subpath name (joined under --host-path-base-dir) for capture artifacts on the node. Must be a relative subpath and must not contain '..'.")
 	createCapture.Flags().StringVar(&opts.hostPathBaseDir, "host-path-base-dir", DefaultHostPathBaseDir, "Absolute base directory on the node under which --host-path is joined")
@@ -478,6 +521,8 @@ func createCaptureF(ctx context.Context, kubeClient kubernetes.Interface) (*reti
 		retinacmd.Logger.Info(fmt.Sprintf("The capture duration is set to %s", opts.duration))
 		capture.Spec.CaptureConfiguration.CaptureOption.Duration = &metav1.Duration{Duration: opts.duration}
 	}
+
+	retinacmd.Logger.Info(fmt.Sprintf("Capture Jobs will be created in namespace %q", *opts.Namespace))
 
 	if opts.namespaceSelectors != "" || opts.podSelectors != "" || opts.podNames != "" || opts.nodeNames != "" {
 		// if node selector is using the default value (aka hasn't been set by user), set it to nil to prevent clash
@@ -734,6 +779,144 @@ func createJobs(ctx context.Context, kubeClient kubernetes.Interface, capture *r
 		retinacmd.Logger.Info("Packet capture job is created", zap.String("namespace", *opts.Namespace), zap.String("capture job", jobCreated.Name))
 	}
 	return jobsCreated, nil
+}
+
+func waitForJobsToStart(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) error {
+	return waitForJobsToStartWithTimeout(ctx, kubeClient, jobs, JobStartupTimeout)
+}
+
+// waitForJobsToStartWithTimeout polls, for up to timeout, whether the capture jobs' pods
+// were admitted. Kubernetes accepts a Job even when its pod is rejected (e.g. by an
+// admission policy), so a successful Job creation does not guarantee the pod started; the
+// Job controller instead reports the rejection as a "FailedCreate" Job Event. This check is
+// best-effort: it returns nil without an error if the caller cannot list Job Events or Jobs
+// (a recorded failure can never be confirmed as final without Job status), and it only warns
+// (without failing) if a job's outcome is still unknown once timeout elapses.
+func waitForJobsToStartWithTimeout(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, timeout time.Duration) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+
+	pendingJobs := make(map[types.UID]batchv1.Job, len(jobs))
+	for i := range jobs {
+		pendingJobs[jobs[i].UID] = jobs[i]
+	}
+	failedCreates := map[types.UID]string{}
+
+	eventSelector := fields.AndSelectors(
+		fields.OneTermEqualSelector("involvedObject.kind", "Job"),
+		fields.OneTermEqualSelector("type", corev1.EventTypeWarning),
+		fields.OneTermEqualSelector("reason", "FailedCreate"),
+	).String()
+
+	startupCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(JobStartupPollPeriod)
+	defer ticker.Stop()
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return err //nolint:wrapcheck //internal return
+		}
+
+		if err := removeStartedJobs(startupCtx, kubeClient, jobs, pendingJobs, failedCreates); err != nil {
+			if k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err) {
+				// Without Job status we can never confirm whether a recorded FailedCreate
+				// later recovered, so a cached failure can no longer be trusted as final.
+				retinacmd.Logger.Warn("Cannot check capture job startup because jobs could not be listed", zap.Error(err))
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr //nolint:wrapcheck //internal return
+				}
+				return nil
+			}
+			retinacmd.Logger.Warn("Failed to list jobs while checking capture job startup", zap.Error(err))
+		}
+
+		events, err := kubeClient.CoreV1().Events(jobs[0].Namespace).List(startupCtx, metav1.ListOptions{FieldSelector: eventSelector})
+		switch {
+		case err == nil:
+			recordFailedCreates(events.Items, pendingJobs, failedCreates)
+		case k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err):
+			retinacmd.Logger.Warn("Cannot check capture job startup because events could not be listed", zap.Error(err))
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr //nolint:wrapcheck //internal return
+			}
+			return jobStartupResult(jobs, failedCreates)
+		default:
+			retinacmd.Logger.Warn("Failed to list events while checking capture job startup", zap.Error(err))
+		}
+
+		if len(pendingJobs) == 0 {
+			return jobStartupResult(jobs, failedCreates)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err() //nolint:wrapcheck //internal return
+		case <-startupCtx.Done():
+			return jobStartupTimeoutResult(jobs, pendingJobs, failedCreates)
+		case <-ticker.C:
+		}
+	}
+}
+
+// removeStartedJobs clears jobs whose pod has been admitted (Job status reports it as
+// Active or Succeeded) from pendingJobs and failedCreates, using a single batched List call.
+func removeStartedJobs(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	listOptions := metav1.ListOptions{}
+	if captureName := jobs[0].Labels[captureLabels.CaptureNameLabel]; captureName != "" {
+		listOptions.LabelSelector = labels.Set{captureLabels.CaptureNameLabel: captureName}.String()
+	}
+	currentJobs, err := kubeClient.BatchV1().Jobs(jobs[0].Namespace).List(ctx, listOptions)
+	if err != nil {
+		return err //nolint:wrapcheck //internal return
+	}
+	for i := range currentJobs.Items {
+		currentJob := &currentJobs.Items[i]
+		uid := currentJob.UID
+		if _, ok := pendingJobs[uid]; ok && (currentJob.Status.Active > 0 || currentJob.Status.Succeeded > 0) {
+			delete(pendingJobs, uid)
+			delete(failedCreates, uid)
+		}
+	}
+	return nil
+}
+
+func recordFailedCreates(events []corev1.Event, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) {
+	for i := range events {
+		event := &events[i]
+		if _, ok := pendingJobs[event.InvolvedObject.UID]; ok {
+			failedCreates[event.InvolvedObject.UID] = event.Message
+		}
+	}
+}
+
+func jobStartupResult(jobs []batchv1.Job, failedCreates map[types.UID]string) error {
+	for i := range jobs {
+		if message, ok := failedCreates[jobs[i].UID]; ok {
+			// Message is a Kubernetes Event message, not a static sentinel error.
+			return fmt.Errorf("capture job %s failed to create a pod: %s", jobs[i].Name, message) //nolint:err113 // dynamic Kubernetes Event message
+		}
+	}
+	return nil
+}
+
+func jobStartupTimeoutResult(jobs []batchv1.Job, pendingJobs map[types.UID]batchv1.Job, failedCreates map[types.UID]string) error {
+	if err := jobStartupResult(jobs, failedCreates); err != nil {
+		return err
+	}
+	if len(pendingJobs) == 0 {
+		return nil
+	}
+	pendingNames := make([]string, 0, len(pendingJobs))
+	for i := range jobs {
+		if _, ok := pendingJobs[jobs[i].UID]; ok {
+			pendingNames = append(pendingNames, jobs[i].Name)
+		}
+	}
+	retinacmd.Logger.Warn("Capture job startup could not be confirmed before timeout", zap.Strings("jobs", pendingNames))
+	return nil
 }
 
 func waitUntilJobsComplete(ctx context.Context, kubeClient kubernetes.Interface, jobs []batchv1.Job) bool {
