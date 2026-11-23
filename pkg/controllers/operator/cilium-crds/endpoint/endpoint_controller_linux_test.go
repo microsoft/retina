@@ -2,13 +2,18 @@ package endpointcontroller
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
+	"github.com/cilium/cilium/pkg/k8s/client/clientset/versioned"
+	ciliumv2client "github.com/cilium/cilium/pkg/k8s/client/clientset/versioned/typed/cilium.io/v2"
 	ciliumclient "github.com/cilium/cilium/pkg/k8s/client/testutils"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	v1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
@@ -20,6 +25,7 @@ import (
 	ciliumutil "github.com/microsoft/retina/pkg/utils/testutil/cilium"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func podTestX() (resource.Key, *v1.Pod) {
@@ -548,6 +554,127 @@ func TestNamespaceUpdate(t *testing.T) {
 	require.Equal(t, expectedCEP, cep)
 }
 
+var errInjectedPatch = errors.New("injected patch failure")
+
+// failingPatchClient fails the next N CiliumEndpoint patches for the named endpoint.
+type failingPatchClient struct {
+	versioned.Interface
+	failName  string
+	failCount int
+}
+
+func (c *failingPatchClient) CiliumV2() ciliumv2client.CiliumV2Interface {
+	return &failingPatchCiliumV2{CiliumV2Interface: c.Interface.CiliumV2(), parent: c}
+}
+
+type failingPatchCiliumV2 struct {
+	ciliumv2client.CiliumV2Interface
+	parent *failingPatchClient
+}
+
+func (c *failingPatchCiliumV2) CiliumEndpoints(namespace string) ciliumv2client.CiliumEndpointInterface {
+	return &failingPatchEndpoints{CiliumEndpointInterface: c.CiliumV2Interface.CiliumEndpoints(namespace), parent: c.parent}
+}
+
+type failingPatchEndpoints struct {
+	ciliumv2client.CiliumEndpointInterface
+	parent *failingPatchClient
+}
+
+func (c *failingPatchEndpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*ciliumv2.CiliumEndpoint, error) {
+	if name == c.parent.failName && c.parent.failCount > 0 {
+		c.parent.failCount--
+		return nil, errInjectedPatch
+	}
+	//nolint:wrapcheck // pass through mock errors
+	return c.CiliumEndpointInterface.Patch(ctx, name, pt, data, opts, subresources...)
+}
+
+func TestNamespaceUpdateRetriesFailedPods(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	podKeyX, podX := podTestX()
+	podKeyY, podY := podTestX()
+	podKeyY.Name = "y"
+	podY.Name = "y"
+	podY.UID = "222"
+	podY.Status.PodIP = "1.2.3.5"
+	podKeyZ, podZ := podTestX()
+	podKeyZ.Name = "z"
+	podZ.Name = "z"
+	podZ.UID = "333"
+	podZ.Status.PodIP = "1.2.3.6"
+
+	require.NoError(t, r.reconcileNamespace(context.TODO(), &v1.Namespace{
+		ObjectMeta: slim_metav1.ObjectMeta{Name: "test", ResourceVersion: "1"},
+	}))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyX, podX))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyY, podY))
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKeyZ, podZ))
+
+	r.clientset = &failingPatchClient{Interface: r.clientset, failName: "y", failCount: 1}
+
+	ns := &v1.Namespace{
+		ObjectMeta: slim_metav1.ObjectMeta{
+			Name:            "test",
+			Labels:          map[string]string{"k1": "v1"},
+			ResourceVersion: "2",
+		},
+	}
+	nsLabel := "k8s:io.cilium.k8s.namespace.labels.k1=v1"
+
+	err := r.reconcileNamespace(context.TODO(), ns)
+	require.ErrorIs(t, err, errInjectedPatch)
+
+	// the old namespace is restored so the retry is not skipped
+	cachedNs, ok := r.store.GetNamespace("test")
+	require.True(t, ok)
+	require.Equal(t, "1", cachedNs.GetResourceVersion())
+
+	// pods other than the failed one are still updated
+	require.Contains(t, getAndAssertCEPExists(t, ciliumEndpoints, podX).Status.Identity.Labels, nsLabel)
+	require.NotContains(t, getAndAssertCEPExists(t, ciliumEndpoints, podY).Status.Identity.Labels, nsLabel)
+	require.Contains(t, getAndAssertCEPExists(t, ciliumEndpoints, podZ).Status.Identity.Labels, nsLabel)
+
+	// retry with the same namespace object
+	require.NoError(t, r.reconcileNamespace(context.TODO(), ns))
+	cachedNs, ok = r.store.GetNamespace("test")
+	require.True(t, ok)
+	require.Equal(t, "2", cachedNs.GetResourceVersion())
+
+	for _, pod := range []*v1.Pod{podX, podY, podZ} {
+		cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+		require.Contains(t, cep.Status.Identity.Labels, nsLabel, "pod %s", pod.Name)
+	}
+}
+
+func TestPatchIdentityIDChangedWithEqualLabels(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	podKey, pod := podTestX()
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+	expectedID := cep.Status.Identity.ID
+	require.NotZero(t, expectedID)
+
+	// simulate an operator restart with a CEP carrying a stale identity ID for the same labels
+	staleCEP := cep.DeepCopy()
+	staleCEP.Status.Identity.ID = expectedID + 1000
+	ciliumEndpoints.Upsert(staleCEP)
+	r.store.DeletePod(podKey)
+
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	cep = getAndAssertCEPExists(t, ciliumEndpoints, pod)
+	require.Equal(t, expectedID, cep.Status.Identity.ID)
+	require.Equal(t, staleCEP.Status.Identity.Labels, cep.Status.Identity.Labels)
+
+	pep, ok := r.store.GetPod(podKey)
+	require.True(t, ok)
+	require.Equal(t, expectedID, pep.identityID)
+}
+
 func TestUpdateFailurePodLabelsChanged(_ *testing.T) {
 }
 
@@ -678,14 +805,16 @@ func newTestEndpointReconciler(t *testing.T) (*endpointReconciler, *ciliumutil.M
 		podEvents:           nil,
 		ciliumEndpoints:     ciliumEndpoints,
 		ciliumSlimClientSet: fakeClientSet.SlimFakeClientset,
+		k8sClient:           fakeClientSet,
 		store:               NewStore(),
 		Mutex:               &sync.Mutex{},
+		windowsNodes:        make(map[string]bool),
 	}
 
 	// make sure to use CRD mode (this is referenced in InitIdentityAllocator)
 	option.Config.IdentityAllocationMode = option.IdentityAllocationModeCRD
 	// Use the Cilium fake clientset for identity manager since it has proper watch support
-	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset)
+	im, err := NewIdentityManager(context.Background(), l, fakeClientSet.CiliumFakeClientset, false)
 	require.NoError(t, err)
 	r.identityManager = im
 
@@ -706,4 +835,298 @@ func getAndAssertCEPExists(t *testing.T, ciliumEndpoints *ciliumutil.MockResourc
 	require.NoError(t, err)
 	require.True(t, ok, "cilium endpoint should exist")
 	return cep
+}
+
+func createNode(t *testing.T, c corev1.CoreV1Interface, name, os string) {
+	t.Helper()
+	_, err := c.Nodes().Create(context.TODO(), &v1.Node{
+		ObjectMeta: slim_metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"kubernetes.io/os": os},
+		},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+}
+
+func podOnNode(name, node, ip string) (resource.Key, *v1.Pod) {
+	key, pod := podTestX()
+	key.Name = name
+	pod.Name = name
+	pod.UID = "uid-" + types.UID(name)
+	pod.Spec.NodeName = node
+	pod.Status.PodIP = ip
+	return key, pod
+}
+
+func TestWindowsOnlyEndpointsSkipsLinuxPods(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	r.cfg = Config{WindowsOnlyEndpoints: true}
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "linux-node", "linux")
+	createNode(t, r.ciliumSlimClientSet.CoreV1(), "win-node", "windows")
+
+	linuxKey, linuxPod := podOnNode("linux-pod", "linux-node", "10.244.0.5")
+	require.NoError(t, r.ReconcilePod(context.TODO(), linuxKey, linuxPod))
+	_, ok := r.store.GetPod(linuxKey)
+	require.False(t, ok, "linux pod must not be managed")
+	assertCEPDoesNotExist(t, ciliumEndpoints, linuxKey)
+	require.NoError(t, r.HandlePodDelete(context.TODO(), linuxKey))
+
+	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	cep := getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+	require.Contains(t, cep.Status.Identity.Labels, "k8s:k1=v1")
+
+	// Reconciling again with unchanged labels must not allocate a new identity.
+	id := cep.Status.Identity.ID
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	require.Equal(t, id, getAndAssertCEPExists(t, ciliumEndpoints, winPod).Status.Identity.ID)
+}
+
+func TestDefaultConfigUnchanged(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+
+	// No node objects exist: the default config must not look up node OS.
+	winKey, winPod := podOnNode("win-pod", "win-node", "10.244.1.57")
+	require.NoError(t, r.ReconcilePod(context.TODO(), winKey, winPod))
+	getAndAssertCEPExists(t, ciliumEndpoints, winPod)
+}
+
+const (
+	testIPv4      = "10.244.1.57"
+	testIPv6      = "fd00:10:244:1::39"
+	testZonedIPv6 = "fe80::1%eth0"
+)
+
+func withPodIPs(pod *v1.Pod, ips ...string) {
+	pod.Status.PodIPs = nil
+	for _, ip := range ips {
+		pod.Status.PodIPs = append(pod.Status.PodIPs, v1.PodIP{IP: ip})
+	}
+	if len(ips) > 0 {
+		pod.Status.PodIP = ips[0]
+	}
+}
+
+func TestPodDualStackAddressing(t *testing.T) {
+	tests := []struct {
+		name     string
+		podIP    string
+		podIPs   []string
+		wantIPv4 string
+		wantIPv6 string
+		noCEP    bool
+	}{
+		{name: "ipv4 PodIP only", podIP: testIPv4, wantIPv4: testIPv4},
+		{name: "ipv4 PodIPs", podIPs: []string{testIPv4}, wantIPv4: testIPv4},
+		{name: "dual-stack ipv4 first", podIPs: []string{testIPv4, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "dual-stack ipv6 first", podIPs: []string{testIPv6, testIPv4}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "ipv6 only", podIPs: []string{testIPv6}, wantIPv6: testIPv6},
+		{name: "ipv6 PodIP only", podIP: testIPv6, wantIPv6: testIPv6},
+		{name: "ipv6 canonicalized", podIPs: []string{"FD00:10:244:1:0:0:0:39"}, wantIPv6: testIPv6},
+		{name: "first address per family", podIPs: []string{testIPv4, "10.244.1.58", testIPv6, "fd00::1"}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "ipv4-mapped ipv6 is ipv4", podIPs: []string{"::ffff:" + testIPv4, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "zoned ipv6 skipped", podIPs: []string{testIPv4, testZonedIPv6, testIPv6}, wantIPv4: testIPv4, wantIPv6: testIPv6},
+		{name: "zoned only", podIPs: []string{testZonedIPv6}, noCEP: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ciliumEndpoints := newTestEndpointReconciler(t)
+			createNamespace(r.ciliumSlimClientSet.CoreV1())
+			podKey, pod := podTestX()
+			pod.Status.PodIP = tt.podIP
+			if tt.podIPs != nil {
+				withPodIPs(pod, tt.podIPs...)
+			}
+
+			require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+			pep, ok := r.store.GetPod(podKey)
+			if tt.noCEP {
+				require.False(t, ok)
+				assertCEPDoesNotExist(t, ciliumEndpoints, podKey)
+				return
+			}
+			require.True(t, ok)
+			require.Equal(t, tt.wantIPv4, pep.ipv4)
+			require.Equal(t, tt.wantIPv6, pep.ipv6)
+
+			cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+			require.Equal(t, ciliumv2.AddressPairList{{IPV4: tt.wantIPv4, IPV6: tt.wantIPv6}}, cep.Status.Networking.Addressing)
+			require.Equal(t, []string{"k8s:io.cilium.k8s.policy.cluster", "k8s:io.kubernetes.pod.namespace=test", "k8s:k1=v1"},
+				cep.Status.Identity.Labels, "IP addresses do not change identity labels")
+		})
+	}
+}
+
+func TestIPv4OnlyCEPStatusUnchanged(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, "1.2.3.4")
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+
+	b, err := json.Marshal(getAndAssertCEPExists(t, ciliumEndpoints, pod).Status.Networking)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"addressing":[{"ipv4":"1.2.3.4"}],"node":"10.0.0.1"}`, string(b))
+}
+
+func TestPodWithUnparsableIPs(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, "not-an-ip")
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	assertCEPDoesNotExist(t, ciliumEndpoints, podKey)
+}
+
+// TestExistingCEPAddressing covers CEPs found in the store at startup (not in the cache).
+func TestExistingCEPAddressing(t *testing.T) {
+	const existingEndpointID = 7
+	tests := []struct {
+		name           string
+		addressing     ciliumv2.AddressPairList
+		podIPs         []string
+		wantEndpointID int64
+	}{
+		{
+			name:           "ipv6 only, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV6: testIPv6}},
+			podIPs:         []string{testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "dual-stack, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: testIPv6}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "dual-stack in separate pairs, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV6: testIPv6}, {IPV4: testIPv4}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "ipv4 only, pod gained ipv6",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv4}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID + 1,
+		},
+		{
+			name:           "non-canonical ipv6, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: "FD00:10:244:1:0:0:0:39"}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "legacy ipv6 in ipv4 field, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: testIPv6}},
+			podIPs:         []string{testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "mapped ipv4 in ipv6 field, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV6: "::ffff:" + testIPv4}},
+			podIPs:         []string{testIPv4},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "mapped ipv4 in ipv4 field, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: "::ffff:" + testIPv4}},
+			podIPs:         []string{testIPv4},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "invalid first pair, valid second pair, unchanged",
+			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: testZonedIPv6}, {IPV4: testIPv4, IPV6: testIPv6}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID,
+		},
+		{
+			name:           "no valid address, repaired",
+			addressing:     ciliumv2.AddressPairList{{IPV4: "garbage", IPV6: testZonedIPv6}},
+			podIPs:         []string{testIPv4, testIPv6},
+			wantEndpointID: existingEndpointID + 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, ciliumEndpoints := newTestEndpointReconciler(t)
+			createNamespace(r.ciliumSlimClientSet.CoreV1())
+			podKey, pod := podTestX()
+			withPodIPs(pod, tt.podIPs...)
+			lbls, err := r.ciliumEndpointsLabels(context.TODO(), pod)
+			require.NoError(t, err)
+			idID, err := r.identityManager.GetIdentityAndIncrementReference(context.TODO(), lbls)
+			require.NoError(t, err)
+
+			ciliumEndpoints.Upsert(&ciliumv2.CiliumEndpoint{
+				ObjectMeta: metav1.ObjectMeta{Name: podKey.Name, Namespace: podKey.Namespace},
+				Status: ciliumv2.EndpointStatus{
+					ID: existingEndpointID,
+					Identity: &ciliumv2.EndpointIdentity{
+						ID:     idID,
+						Labels: lbls.GetModel(),
+					},
+					Networking: &ciliumv2.EndpointNetworking{NodeIP: "10.0.0.1", Addressing: tt.addressing},
+					State:      "ready",
+				},
+			})
+
+			require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+			pep, ok := r.store.GetPod(podKey)
+			require.True(t, ok)
+			require.Equal(t, tt.wantEndpointID, pep.endpointID)
+			var wantIPv4, wantIPv6 string
+			if slices.Contains(tt.podIPs, testIPv4) {
+				wantIPv4 = testIPv4
+			}
+			if slices.Contains(tt.podIPs, testIPv6) {
+				wantIPv6 = testIPv6
+			}
+			require.Equal(t, wantIPv4, pep.ipv4)
+			require.Equal(t, wantIPv6, pep.ipv6)
+
+			cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+			wantAddr := tt.addressing
+			if tt.wantEndpointID != existingEndpointID {
+				wantAddr = ciliumv2.AddressPairList{{IPV4: wantIPv4, IPV6: wantIPv6}}
+			}
+			require.Equal(t, wantAddr, cep.Status.Networking.Addressing)
+			require.Equal(t, tt.wantEndpointID, cep.Status.ID)
+			require.Equal(t, idID, cep.Status.Identity.ID)
+		})
+	}
+}
+
+func TestPodIPv6Changed(t *testing.T) {
+	r, ciliumEndpoints := newTestEndpointReconciler(t)
+	createNamespace(r.ciliumSlimClientSet.CoreV1())
+	podKey, pod := podTestX()
+	withPodIPs(pod, testIPv4, testIPv6)
+	require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod))
+	pep, _ := r.store.GetPod(podKey)
+	identityID := pep.identityID
+	endpointID := pep.endpointID
+
+	steps := []struct {
+		name   string
+		podIPs []string
+		want   ciliumv2.AddressPairList
+	}{
+		{"ipv6 changed", []string{testIPv4, "fd00:10:244:1::40"}, ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: "fd00:10:244:1::40"}}},
+		{"ipv6 removed", []string{testIPv4}, ciliumv2.AddressPairList{{IPV4: testIPv4}}},
+		{"ipv6 added", []string{testIPv4, testIPv6}, ciliumv2.AddressPairList{{IPV4: testIPv4, IPV6: testIPv6}}},
+	}
+	for _, step := range steps {
+		_, pod = podTestX()
+		withPodIPs(pod, step.podIPs...)
+		require.NoError(t, r.ReconcilePod(context.TODO(), podKey, pod), step.name)
+		endpointID++
+		cep := getAndAssertCEPExists(t, ciliumEndpoints, pod)
+		require.Equal(t, step.want, cep.Status.Networking.Addressing, step.name)
+		require.Equal(t, endpointID, cep.Status.ID, step.name)
+		require.Equal(t, identityID, cep.Status.Identity.ID, "%s: identity unchanged", step.name)
+	}
 }

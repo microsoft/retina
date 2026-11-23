@@ -16,6 +16,10 @@ import (
 // Default timeout for identity allocation operations
 const identityAllocatorTimeout = 2 * time.Minute
 
+// ErrIdentityNotFound is returned in operator-managed mode when cilium-operator has not yet created
+// a CiliumIdentity for the requested labels.
+var ErrIdentityNotFound = errors.New("identity not found")
+
 // IdentityManager is analogous to Cilium Daemon's identity allocation.
 // Cilium has an IPCacche holding IP to Identity mapping.
 // In IPCache.InjectLabels(), IPCacche is told of IPs which have been updated.
@@ -31,6 +35,9 @@ type IdentityManager struct {
 	alloc *cache.CachingIdentityAllocator
 	// labelIdentities maps sorted labels (via labels.Labels.String()) to allocated identity
 	labelIdentities map[string]identity.NumericIdentity
+	// operatorManaged means cilium-operator creates CiliumIdentities: they are only looked up,
+	// no references are held and labelIdentities is unused.
+	operatorManaged bool
 }
 
 // owner is a no-op implementation of IdentityAllocatorOwner
@@ -48,20 +55,24 @@ func (o *owner) GetNodeSuffix() string {
 	return ""
 }
 
-func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.Interface) (*IdentityManager, error) {
+// NewIdentityManager creates the identity allocator. With operatorManaged, identities are never created:
+// they are looked up, and ErrIdentityNotFound is returned until cilium-operator creates them.
+func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.Interface, operatorManaged bool) (*IdentityManager, error) {
 	// Configure the allocator with a reasonable timeout for identity operations
 	allocConfig := cache.AllocatorConfig{
-		Timeout:      identityAllocatorTimeout,
-		SyncInterval: 1 * time.Hour,
+		EnableOperatorManageCIDs: operatorManaged,
+		Timeout:                  identityAllocatorTimeout,
+		SyncInterval:             1 * time.Hour,
 	}
 
 	im := &IdentityManager{
 		l:               l.With("component", "identitymanager"),
 		alloc:           cache.NewCachingIdentityAllocator(l, &owner{}, allocConfig),
 		labelIdentities: make(map[string]identity.NumericIdentity),
+		operatorManaged: operatorManaged,
 	}
 
-	im.l.Info("initializing identity allocator")
+	im.l.Info("initializing identity allocator", "operatorManaged", operatorManaged)
 	initCh := im.alloc.InitIdentityAllocator(client, nil)
 
 	// Wait for the identity allocator to be initialized (backend is created)
@@ -81,6 +92,11 @@ func NewIdentityManager(ctx context.Context, l *slog.Logger, client versioned.In
 // Whenever reference count is not 0, then the identity will exist in the local store, and syncLocalKeys() will make sure it exists.
 func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.Labels) {
 	sortedLabels := lbls.String()
+	if im.operatorManaged {
+		// No reference is held. cilium-operator owns the identity's lifecycle.
+		return
+	}
+
 	id, ok := im.labelIdentities[sortedLabels]
 	if !ok {
 		im.l.Warn("expected identity for labels", "labels", sortedLabels)
@@ -126,7 +142,13 @@ func (im *IdentityManager) DecrementReference(ctx context.Context, lbls labels.L
 // GetIdentityAndIncrementReference will create/get an identity ID and increment the reference count in the allocator's store.
 // For proper garbage collection of stale identities, this must be called exactly once per created/relabeled Pod.
 // Whenever reference count is not 0, then the identity will exist in the local store, and syncLocalKeys() will make sure it exists.
+// In operator-managed mode the identity is only looked up (no reference is held), and ErrIdentityNotFound is
+// returned if cilium-operator has not created it yet.
 func (im *IdentityManager) GetIdentityAndIncrementReference(ctx context.Context, lbls labels.Labels) (int64, error) {
+	if im.operatorManaged {
+		return im.lookupIdentity(ctx, lbls)
+	}
+
 	// notifyOwner=false because no need to notify owner (via UpdateIdentities callback).
 	// oldNID=identity.InvalidIdentity would only be used for local identities (e.g. node-local CIDR identity), which we don't use.
 	// Since this operation will create the CiliumIdentity if needed,
@@ -141,6 +163,20 @@ func (im *IdentityManager) GetIdentityAndIncrementReference(ctx context.Context,
 	// info-level logging occurs within Allocator for reusing or allocating a new identity/global key
 
 	im.labelIdentities[lbls.String()] = idObj.ID
+
+	return int64(idObj.ID), nil
+}
+
+func (im *IdentityManager) lookupIdentity(ctx context.Context, lbls labels.Labels) (int64, error) {
+	// LookupIdentity returns nil until the initial CiliumIdentity informer sync completes.
+	if err := im.alloc.WaitForInitialGlobalIdentities(ctx); err != nil {
+		return -1, errors.Wrap(err, "failed waiting for initial identity sync")
+	}
+
+	idObj := im.alloc.LookupIdentity(ctx, lbls)
+	if idObj == nil {
+		return -1, errors.Wrapf(ErrIdentityNotFound, "labels %s", lbls.String())
+	}
 
 	return int64(idObj.ID), nil
 }

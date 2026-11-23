@@ -6,7 +6,9 @@ package endpointcontroller
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"log/slog"
+	"net/netip"
 	"reflect"
 	"sync"
 	"time"
@@ -14,10 +16,13 @@ import (
 	"github.com/microsoft/retina/pkg/controllers/operator/cilium-crds/cache"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
+	identitykey "github.com/cilium/cilium/pkg/identity/key"
 	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	k8sClient "github.com/cilium/cilium/pkg/k8s/client"
@@ -43,12 +48,20 @@ const (
 
 var ErrClientsetDisabled = errors.New("failure due to clientset disabled")
 
+// Backoff between attempts to read a valid cilium-config. Variables so tests can shorten them.
+var (
+	operatorIdentitiesSetupInitialBackoff = time.Second
+	operatorIdentitiesSetupMaxBackoff     = time.Minute
+)
+
 // endpointReconciler managed the lifecycle of CiliumEndpoints and CiliumIdentities from Pods.
 type endpointReconciler struct {
 	*sync.Mutex
 	l                   *slog.Logger
 	clientset           versioned.Interface
 	ciliumSlimClientSet slim_clientset.Interface
+	// k8sClient reads kube-system/cilium-config when ReuseOperatorIdentities is set.
+	k8sClient kubernetes.Interface
 	// podEvents represents Pod CRUD events relayed from the Pod controller. If the Pod was deleted, the PodCacheObject.Pod field will be nil
 	podEvents chan cache.PodCacheObject
 	// ciliumEndpoints has a store of CiliumEndpoints in API Server
@@ -70,6 +83,12 @@ type endpointReconciler struct {
 	store *Store
 
 	wp *workerpool.WorkerPool
+	// setupDone is closed when the ReuseOperatorIdentities setup task exits.
+	setupDone chan struct{}
+
+	cfg Config
+	// windowsNodes caches whether a node runs Windows (node OS does not change). Guarded by Mutex.
+	windowsNodes map[string]bool
 }
 
 type params struct {
@@ -80,6 +99,7 @@ type params struct {
 	CiliumEndpoints resource.Resource[*ciliumv2.CiliumEndpoint]
 	Namespaces      resource.Resource[*slim_corev1.Namespace]
 	Pods            resource.Resource[*slim_corev1.Pod]
+	Config          Config
 }
 
 func registerEndpointController(p params) error {
@@ -93,10 +113,22 @@ func registerEndpointController(p params) error {
 		l:                   l,
 		clientset:           p.Clientset,
 		ciliumSlimClientSet: p.Clientset.Slim(),
+		k8sClient:           p.Clientset,
 		ciliumEndpoints:     p.CiliumEndpoints,
 		pods:                p.Pods,
 		namespaces:          p.Namespaces,
 		store:               NewStore(),
+		cfg:                 p.Config,
+		windowsNodes:        make(map[string]bool),
+	}
+
+	l.Info("endpoint controller config",
+		WindowsOnlyEndpoints, p.Config.WindowsOnlyEndpoints,
+		ReuseOperatorIdentities, p.Config.ReuseOperatorIdentities,
+	)
+	if p.Config.ReuseOperatorIdentities && !p.Config.WindowsOnlyEndpoints {
+		l.Warn("--" + ReuseOperatorIdentities + " is set without --" + WindowsOnlyEndpoints +
+			"; CiliumEndpoints are also created for Pods on Linux nodes and compete with the Cilium agent")
 	}
 
 	p.Lifecycle.Append(r)
@@ -105,18 +137,89 @@ func registerEndpointController(p params) error {
 }
 
 func (r *endpointReconciler) Start(ctx cell.HookContext) error {
-	// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
-	// There is a way to disable auto-start but then there is no exposed function to simply start().
-	im, err := NewIdentityManager(ctx, r.l, r.clientset)
-	if err != nil {
-		return errors.Wrap(err, "failed to create identity manager")
+	if !r.cfg.ReuseOperatorIdentities {
+		// NOTE: we must create IdentityManager on leader election since its allocator auto-starts on creation.
+		// There is a way to disable auto-start but then there is no exposed function to simply start().
+		im, err := NewIdentityManager(ctx, r.l, r.clientset, false)
+		if err != nil {
+			return errors.Wrap(err, "failed to create identity manager")
+		}
+
+		r.identityManager = im
+
+		// making sure we have only one thread running at a time.
+		r.wp = workerpool.New(MaxWorkers)
+		return r.startControllers()
 	}
 
+	r.setupDone = make(chan struct{})
+	r.wp = workerpool.New(MaxWorkers)
+	// cilium-config may be missing or invalid; retry in the background so the operator keeps running.
+	if err := r.wp.Submit("operator-identities-setup", r.runOperatorIdentitiesSetup); err != nil {
+		close(r.setupDone)
+		r.l.Error("failed to submit operator identities setup task", "error", err)
+	}
+
+	return nil
+}
+
+// runOperatorIdentitiesSetup reads cilium-config until it is valid, then starts the controllers.
+// It configures process-global label filtering, so the controllers start only after it succeeds.
+func (r *endpointReconciler) runOperatorIdentitiesSetup(ctx context.Context) error {
+	defer close(r.setupDone)
+
+	backoff := operatorIdentitiesSetupInitialBackoff
+	var lastErr string
+	for {
+		attemptCtx, cancel := context.WithTimeout(ctx, RequestTimeout)
+		err := r.setupOperatorIdentities(attemptCtx)
+		cancel()
+		if err == nil {
+			break
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		msg := "failed to set up --" + ReuseOperatorIdentities + "; Windows CiliumEndpoints are not managed until " +
+			ciliumConfigNamespace + "/" + ciliumConfigName + " is fixed"
+		if err.Error() != lastErr {
+			r.l.Error(msg, "error", err, "retryIn", backoff)
+			lastErr = err.Error()
+		} else {
+			r.l.Debug(msg, "error", err, "retryIn", backoff)
+		}
+
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil
+		case <-timer.C:
+		}
+		backoff = min(backoff*2, operatorIdentitiesSetupMaxBackoff)
+	}
+
+	im, err := NewIdentityManager(ctx, r.l, r.clientset, true)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
+		r.l.Error("failed to create identity manager; Windows CiliumEndpoints are not managed", "error", err)
+		return nil
+	}
 	r.identityManager = im
 
-	// making sure we have only one thread running at a time.
-	r.wp = workerpool.New(MaxWorkers)
+	if err := r.startControllers(); err != nil {
+		if errors.Is(err, workerpool.ErrClosed) || errors.Is(err, context.Canceled) {
+			return nil
+		}
+		r.l.Error("failed to start endpoint controllers", "error", err)
+	}
+	return nil
+}
 
+func (r *endpointReconciler) startControllers() error {
 	if err := r.wp.Submit("namespace-controller", r.runNamespaceEvents); err != nil {
 		return errors.Wrap(err, "failed to submit task to namespace workerpool")
 	}
@@ -129,6 +232,9 @@ func (r *endpointReconciler) Start(ctx cell.HookContext) error {
 }
 
 func (r *endpointReconciler) Stop(_ cell.HookContext) error {
+	if r.wp == nil {
+		return nil
+	}
 	if err := r.wp.Close(); err != nil {
 		return errors.Wrap(err, "failed to stop endpoint workerpool")
 	}
@@ -187,7 +293,9 @@ func (r *endpointReconciler) runEventHandler(pctx context.Context, ev resource.E
 	}
 	cancel()
 
-	if err != nil {
+	if errors.Is(err, ErrIdentityNotFound) {
+		r.l.Info("identity not yet created by cilium-operator, requeuing pod", "error", err, "podKey", ev.Key.String())
+	} else if err != nil {
 		r.l.Error("error creating cilium endpoint. requeuing pod", "error", err, "podKey", ev.Key.String())
 	}
 	ev.Done(err)
@@ -221,7 +329,9 @@ func (r *endpointReconciler) runNamespaceEvents(pctx context.Context) error {
 			}
 			cancel()
 
-			if err != nil {
+			if errors.Is(err, ErrIdentityNotFound) {
+				r.l.Info("identity not yet created by cilium-operator, requeuing namespace", "error", err, "namespaceKey", ev.Key.String())
+			} else if err != nil {
 				r.l.Error("error creating cilium endpoint. requeuing namespace", "error", err, "namespaceKey", ev.Key.String())
 			}
 			ev.Done(err)
@@ -237,6 +347,7 @@ func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, names
 	defer r.Mutex.Unlock()
 	r.l.Debug("reconciling pods in namespace", "namespace", namespace)
 	podList := r.store.ListPodKeysByNamespace(namespace)
+	var errs []error
 	for _, podKey := range podList {
 		pod, ok := r.store.GetPod(podKey)
 		if !ok {
@@ -252,7 +363,9 @@ func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, names
 		newPEP := pod.deepCopy()
 		endpointsLabels, err := r.ciliumEndpointsLabels(ctx, pod.podObj)
 		if err != nil {
-			return errors.Wrap(err, "failed to get pod labels")
+			r.l.Error("failed to get pod labels", "error", err, "podKey", podKey.String())
+			errs = append(errs, errors.Wrapf(err, "failed to get labels for pod %s", podKey.String()))
+			continue
 		}
 		newPEP.lbls = endpointsLabels
 
@@ -265,15 +378,16 @@ func (r *endpointReconciler) ReconcilePodsInNamespace(ctx context.Context, names
 
 		err = r.handlePodUpsert(ctx, newPEP)
 		if err != nil {
-			r.l.Error("failed to upsert pod", "error", err, "podKey", podKey.String())
+			if errors.Is(err, ErrIdentityNotFound) {
+				r.l.Debug("identity not yet created by cilium-operator for pod in namespace", "error", err, "podKey", podKey.String())
+			} else {
+				r.l.Error("failed to upsert pod", "error", err, "podKey", podKey.String())
+			}
+			errs = append(errs, errors.Wrapf(err, "failed to upsert pod %s", podKey.String()))
 		}
-		if err != nil {
-			return errors.Wrap(err, "failed to upsert pod")
-		}
-
 	}
 
-	return nil
+	return stderrors.Join(errs...)
 }
 
 func (r *endpointReconciler) ReconcilePod(ctx context.Context, podKey resource.Key, pod *slim_corev1.Pod) error {
@@ -293,9 +407,21 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 		return nil
 	}
 
-	if pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+	ipv4, ipv6 := podAddrs(pod)
+	if (!ipv4.IsValid() && !ipv6.IsValid()) || pod.Status.HostIP == "" {
 		r.l.Debug("pod missing an IP, skipping", "podKey", podKey.String())
 		return nil
+	}
+
+	if r.cfg.WindowsOnlyEndpoints {
+		isWindows, err := r.isWindowsNode(ctx, pod.Spec.NodeName)
+		if err != nil {
+			return errors.Wrap(err, "failed to determine node OS")
+		}
+		if !isWindows {
+			r.l.Debug("pod is not on a Windows node, skipping", "podKey", podKey.String(), "node", pod.Spec.NodeName)
+			return nil
+		}
 	}
 
 	podLabels, err := r.ciliumEndpointsLabels(ctx, pod)
@@ -305,7 +431,8 @@ func (r *endpointReconciler) reconcilePod(ctx context.Context, podKey resource.K
 	newPEP := &PodEndpoint{
 		key:    podKey,
 		lbls:   podLabels,
-		ipv4:   pod.Status.PodIP,
+		ipv4:   addrString(ipv4),
+		ipv6:   addrString(ipv6),
 		nodeIP: pod.Status.HostIP,
 		// TODO: set to false if in follower mode
 		processedAsLeader: true,
@@ -389,25 +516,27 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 				"networking", oldCEP.Status.Networking,
 			)
 
-			if oldCEP.Status.Networking == nil || len(oldCEP.Status.Networking.Addressing) == 0 || oldCEP.Status.Networking.Addressing[0].IPV4 == "" {
-				// FIXME handle IPv6 and dual-stack
-				inStore = false
-				r.l.Warn("CiliumEndpoint has no ipv4 address, ignoring",
+			oldIPv4, oldIPv6 := cepAddrs(oldCEP.Status.Networking)
+			if oldIPv4 == "" && oldIPv6 == "" {
+				// Patch rather than create: the CEP exists, so a create would fail with AlreadyExists.
+				r.l.Warn("CiliumEndpoint has no valid IP address, repairing",
 					"podKey", newPEP.key.String(),
 					"cep", oldCEP,
 				)
-			} else {
-				oldPEP = &PodEndpoint{
-					key:        newPEP.key,
-					endpointID: oldCEP.Status.ID,
-					ipv4:       oldCEP.Status.Networking.Addressing[0].IPV4,
-					nodeIP:     oldCEP.Status.Networking.NodeIP,
-				}
+			}
+			oldPEP = &PodEndpoint{
+				key:        newPEP.key,
+				endpointID: oldCEP.Status.ID,
+				ipv4:       oldIPv4,
+				ipv6:       oldIPv6,
+			}
+			if oldCEP.Status.Networking != nil {
+				oldPEP.nodeIP = oldCEP.Status.Networking.NodeIP
+			}
 
-				if oldCEP.Status.Identity != nil {
-					oldPEP.identityID = oldCEP.Status.Identity.ID
-					oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
-				}
+			if oldCEP.Status.Identity != nil {
+				oldPEP.identityID = oldCEP.Status.Identity.ID
+				oldPEP.lbls = labels.NewLabelsFromModel(oldCEP.Status.Identity.Labels)
 			}
 		}
 	}
@@ -418,7 +547,7 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 		newPEP.endpointID = oldPEP.endpointID
 		newPEP.identityID = oldPEP.identityID
 
-		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.nodeIP == oldPEP.nodeIP
+		sameNetworking := newPEP.ipv4 == oldPEP.ipv4 && newPEP.ipv6 == oldPEP.ipv6 && newPEP.nodeIP == oldPEP.nodeIP
 		equalLabels := newPEP.lbls.Equals(oldPEP.lbls)
 
 		r.l.Debug("patching CiliumEndpoint",
@@ -447,8 +576,9 @@ func (r *endpointReconciler) handlePodUpsert(ctx context.Context, newPEP *PodEnd
 			newPEP.identityID = identityID
 		}
 
-		if sameNetworking && equalLabels {
-			// nothing to do. pod already has a CEP with the same networking and labels
+		sameIdentity := newPEP.identityID == oldPEP.identityID
+		if sameNetworking && equalLabels && sameIdentity {
+			// nothing to do. pod already has a CEP with the same networking, labels and identity
 			r.l.Debug("pod already processed", "podKey", newPEP.key.String())
 			r.store.AddPod(newPEP)
 			return nil
@@ -628,10 +758,13 @@ func (r *endpointReconciler) reconcileNamespace(ctx context.Context, namespace *
 	r.l.Debug("Updating namespace in cache", "namespace", namespace.GetName())
 	r.store.AddNamespace(namespace)
 
-	// now get all pods and update them as well
+	// now get all pods and update them as well.
+	// The new namespace must be cached first since pod labels are derived from the cached namespace.
 	err := r.ReconcilePodsInNamespace(ctx, namespace.GetName())
 	if err != nil {
-		return errors.Wrap(err, "failed to reconcile pods in namespace"+namespace.GetName())
+		// restore the previous namespace so that a retry of this same event is not treated as already processed
+		r.store.AddNamespace(oldNs)
+		return errors.Wrap(err, "failed to reconcile pods in namespace "+namespace.GetName())
 	}
 	return nil
 }
@@ -675,13 +808,107 @@ func (r *endpointReconciler) ciliumEndpointsLabels(ctx context.Context, pod *sli
 		)
 		return nil, errors.Wrap(err, "failed to get pod metadata")
 	}
-	lbls := make(labels.Labels, len(ciliumLabels))
-	for k, v := range ciliumLabels {
-		lbls[k] = labels.Label{
-			Key:    k,
-			Value:  v,
-			Source: labels.LabelSourceK8s,
+	var lbls labels.Labels
+	if r.cfg.ReuseOperatorIdentities {
+		// Same key as cilium-operator's CID controller, so the identity it created is found.
+		lbls = identitykey.GetCIDKeyFromLabels(ciliumLabels, labels.LabelSourceK8s).Labels()
+	} else {
+		lbls = make(labels.Labels, len(ciliumLabels))
+		for k, v := range ciliumLabels {
+			lbls[k] = labels.Label{
+				Key:    k,
+				Value:  v,
+				Source: labels.LabelSourceK8s,
+			}
 		}
 	}
 	return lbls, nil
+}
+
+// isWindowsNode reports whether the node runs Windows, based on the kubernetes.io/os node label.
+// Callers must hold r.Mutex.
+func (r *endpointReconciler) isWindowsNode(ctx context.Context, nodeName string) (bool, error) {
+	if nodeName == "" {
+		return false, nil
+	}
+	if isWindows, ok := r.windowsNodes[nodeName]; ok {
+		return isWindows, nil
+	}
+	node, err := r.ciliumSlimClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "failed to get node "+nodeName)
+	}
+	isWindows := node.Labels[corev1.LabelOSStable] == string(corev1.Windows)
+	r.windowsNodes[nodeName] = isWindows
+	return isWindows, nil
+}
+
+// podAddrs returns the Pod's first IPv4 and first IPv6 address from Status.PodIPs,
+// falling back to Status.PodIP. A missing family is returned as the zero netip.Addr.
+func podAddrs(pod *slim_corev1.Pod) (ipv4, ipv6 netip.Addr) {
+	ips := make([]string, 0, len(pod.Status.PodIPs)+1)
+	for _, ip := range pod.Status.PodIPs {
+		ips = append(ips, ip.IP)
+	}
+	if len(ips) == 0 {
+		ips = append(ips, pod.Status.PodIP)
+	}
+	for _, ip := range ips {
+		addr, ok := parseAddr(ip)
+		if !ok {
+			continue
+		}
+		switch {
+		case addr.Is4() && !ipv4.IsValid():
+			ipv4 = addr
+		case addr.Is6() && !ipv6.IsValid():
+			ipv6 = addr
+		}
+	}
+	return ipv4, ipv6
+}
+
+// addrString returns the address in Cilium's CiliumEndpoint format, or "" for the zero netip.Addr.
+func addrString(addr netip.Addr) string {
+	if !addr.IsValid() {
+		return ""
+	}
+	return addr.String()
+}
+
+// parseAddr parses ip, rejecting zoned addresses and unmapping IPv4-mapped IPv6 addresses.
+func parseAddr(ip string) (netip.Addr, bool) {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || addr.Zone() != "" {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+// cepAddrs returns the first valid IPv4 and first valid IPv6 address of a CiliumEndpoint in
+// canonical form. Addresses are slotted by their family rather than by field, since older
+// writers stored an IPv6 primary pod IP in the IPV4 field.
+func cepAddrs(networking *ciliumv2.EndpointNetworking) (ipv4, ipv6 string) {
+	if networking == nil {
+		return "", ""
+	}
+	var v4, v6 netip.Addr
+	for _, pair := range networking.Addressing {
+		if pair == nil {
+			continue
+		}
+		for _, ip := range []string{pair.IPV4, pair.IPV6} {
+			addr, ok := parseAddr(ip)
+			if !ok {
+				continue
+			}
+			switch {
+			case addr.Is4() && !v4.IsValid():
+				v4 = addr
+			case addr.Is6() && !v6.IsValid():
+				v6 = addr
+			}
+		}
+	}
+	return addrString(v4), addrString(v6)
 }

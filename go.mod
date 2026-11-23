@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/zap v1.28.0
 	k8s.io/client-go v0.36.4
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.23.2
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.26.2
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.14.0
 )
 
@@ -26,7 +26,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerregistry/armcontainerregistry v1.2.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/keyvault/armkeyvault v1.5.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/privatedns/armprivatedns v1.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets v1.5.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.2.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
@@ -35,7 +35,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.8.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.10.1 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
@@ -199,8 +199,8 @@ require (
 require (
 	github.com/Azure/azure-container-networking/zapai v0.0.3
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.24.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0
@@ -284,7 +284,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v7 v7.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v6 v6.6.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi v1.3.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v9 v9.0.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v12 v12.1.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armdeployments v1.0.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v3 v3.0.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage/v2 v2.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/internal v0.1.0 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.1 // indirect
@@ -500,7 +502,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.5 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260811152304-ee035b5b010f // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
 	golang.org/x/vuln v1.6.0 // indirect

@@ -123,6 +123,8 @@ helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina \
 
 ### Hubble Control Plane
 
+If Linux nodes run Cilium and the cluster also has Windows nodes that run a different CNI, the operator needs extra arguments so that Windows Pods get CiliumEndpoints with cilium-operator identities. See [Windows Nodes in Cilium Clusters](./03-Config.md#windows-nodes-in-cilium-clusters).
+
 ```shell
 VERSION=$( curl -sL https://api.github.com/repos/microsoft/retina/releases/latest | jq -r .name)
 helm upgrade --install retina oci://ghcr.io/microsoft/retina/charts/retina-hubble \
