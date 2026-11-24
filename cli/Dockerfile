@@ -32,9 +32,11 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS libs
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
-    krb5-1.21.3-6.azl3 \
+    expat-2.10.0-1.azl3 \
+    krb5-1.21.3-8.azl3 \
     pcre2-10.48-1.azl3 \
     popt-1.19-2.azl3 \
+    sqlite-libs-3.44.0-5.azl3 \
     zlib-1.3.2-2.azl3 \
     && tdnf clean all
 
@@ -58,9 +60,11 @@ COPY --from=builder /workspace/kubectl-retina .
 FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS shell-target
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
-    krb5-1.21.3-6.azl3 \
+    expat-2.10.0-1.azl3 \
+    krb5-1.21.3-8.azl3 \
     pcre2-10.48-1.azl3 \
     popt-1.19-2.azl3 \
+    sqlite-libs-3.44.0-5.azl3 \
     zlib-1.3.2-2.azl3 \
     && tdnf clean all
 WORKDIR /
