@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitorworkspaces"
 )
 
 const fileperms = 0o600
@@ -38,16 +38,16 @@ az aks update --enable-azure-monitor-metrics \
 	}
 
 	ctx := context.Background()
-	amaClientFactory, err := armmonitor.NewClientFactory(c.SubscriptionID, cred, nil)
+	amaClientFactory, err := armmonitorworkspaces.NewClientFactory(c.SubscriptionID, cred, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create azure monitor workspace client: %w", err)
 	}
 	log.Printf("creating resource group %s in location %s...", c.ResourceGroupName, c.Location)
 
 	// create azure monitor
-	_, err = amaClientFactory.NewAzureMonitorWorkspacesClient().Create(ctx, c.ResourceGroupName, "test", armmonitor.AzureMonitorWorkspaceResource{
+	_, err = amaClientFactory.NewAzureMonitorWorkspacesClient().CreateOrUpdate(ctx, c.ResourceGroupName, "test", armmonitorworkspaces.AzureMonitorWorkspaceResource{
 		Location: &c.Location,
-	}, &armmonitor.AzureMonitorWorkspacesClientCreateOptions{})
+	}, &armmonitorworkspaces.AzureMonitorWorkspacesClientCreateOrUpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to azure monitor workspace: %w", err)
 	}
