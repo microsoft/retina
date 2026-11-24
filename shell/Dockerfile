@@ -43,13 +43,14 @@ RUN tdnf install -y \
 	curl \
 	ebtables-legacy \
 	ethtool \
+	expat-2.10.0-1.azl3 \
 	iperf3 \
 	iproute \
 	ipset \
 	iptables \
 	iputils \
 	jq \
-	krb5-1.21.3-6.azl3 \
+	krb5-1.21.3-8.azl3 \
 	ldns-utils \
 	less \
 	nano \
@@ -63,6 +64,7 @@ RUN tdnf install -y \
 	procps-ng \
 	sysstat \
 	socat \
+	sqlite-libs-3.44.0-5.azl3 \
 	tcpdump \
 	wget \
 	zlib-1.3.2-2.azl3 \

@@ -125,11 +125,13 @@ FROM azurelinux-core AS tools
 RUN tdnf install -y \
     clang \
     bpftool \
+    expat-2.10.0-1.azl3 \
     iproute \
     iptables \
-    krb5-1.21.3-6.azl3 \
+    krb5-1.21.3-8.azl3 \
     pcre2-10.48-1.azl3 \
     popt-1.19-2.azl3 \
+    sqlite-libs-3.44.0-5.azl3 \
     tcpdump \
     which \
     ca-certificates \
