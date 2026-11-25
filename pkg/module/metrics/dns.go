@@ -68,6 +68,7 @@ func (d *DNSMetrics) Init(metricName string) {
 			d.getResponseLabels()...,
 		)
 	}
+	d.setMetricVector(d.dnsMetrics)
 }
 
 func (d *DNSMetrics) getRequestLabels() []string {

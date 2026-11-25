@@ -186,6 +186,10 @@ func (lm *LatencyMetrics) Clean() {
 	}
 }
 
+func (*LatencyMetrics) DeletePodMetrics(string, string) int {
+	return 0
+}
+
 func (lm *LatencyMetrics) ProcessFlow(f *flow.Flow) {
 	if f == nil || f.GetL4() == nil || f.GetL4().GetTCP() == nil || utils.GetTCPID(f) == 0 || f.GetIP() == nil {
 		return

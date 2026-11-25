@@ -13,6 +13,8 @@ import (
 	reflect "reflect"
 
 	log "github.com/microsoft/retina/pkg/log"
+	metrics "github.com/microsoft/retina/pkg/metrics"
+	prometheus "github.com/prometheus/client_golang/prometheus"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -37,6 +39,20 @@ func NewMockbaseMetricInterface(ctrl *gomock.Controller) *MockbaseMetricInterfac
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockbaseMetricInterface) EXPECT() *MockbaseMetricInterfaceMockRecorder {
 	return m.recorder
+}
+
+// DeletePodMetrics mocks base method.
+func (m *MockbaseMetricInterface) DeletePodMetrics(namespace, podName string) int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePodMetrics", namespace, podName)
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// DeletePodMetrics indicates an expected call of DeletePodMetrics.
+func (mr *MockbaseMetricInterfaceMockRecorder) DeletePodMetrics(namespace, podName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePodMetrics", reflect.TypeOf((*MockbaseMetricInterface)(nil).DeletePodMetrics), namespace, podName)
 }
 
 // additionalLabels mocks base method.
@@ -119,6 +135,32 @@ func (m *MockbaseMetricInterface) isLocalContext() bool {
 func (mr *MockbaseMetricInterfaceMockRecorder) isLocalContext() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "isLocalContext", reflect.TypeOf((*MockbaseMetricInterface)(nil).isLocalContext))
+}
+
+// podMetricSelectors mocks base method.
+func (m *MockbaseMetricInterface) podMetricSelectors(namespace, podName string) []prometheus.Labels {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "podMetricSelectors", namespace, podName)
+	ret0, _ := ret[0].([]prometheus.Labels)
+	return ret0
+}
+
+// podMetricSelectors indicates an expected call of podMetricSelectors.
+func (mr *MockbaseMetricInterfaceMockRecorder) podMetricSelectors(namespace, podName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "podMetricSelectors", reflect.TypeOf((*MockbaseMetricInterface)(nil).podMetricSelectors), namespace, podName)
+}
+
+// setMetricVector mocks base method.
+func (m *MockbaseMetricInterface) setMetricVector(metricVector metrics.MetricVec) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "setMetricVector", metricVector)
+}
+
+// setMetricVector indicates an expected call of setMetricVector.
+func (mr *MockbaseMetricInterfaceMockRecorder) setMetricVector(metricVector any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "setMetricVector", reflect.TypeOf((*MockbaseMetricInterface)(nil).setMetricVector), metricVector)
 }
 
 // sourceCtx mocks base method.

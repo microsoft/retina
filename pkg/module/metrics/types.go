@@ -82,6 +82,7 @@ type AdvMetricsInterface interface {
 	// This func is used to clean up old metrics on reconcile.
 	Clean()
 	ProcessFlow(f *flow.Flow)
+	DeletePodMetrics(namespace, podName string) int
 }
 
 type ContextOptionsInterface interface {

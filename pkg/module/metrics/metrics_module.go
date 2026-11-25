@@ -490,6 +490,26 @@ func (m *Module) PodCallBackFn(obj interface{}) {
 		return
 	}
 
+	if event.Type == cache.EventTypePodDeleted {
+		namespace, podName := pod.Namespace(), pod.Name()
+		if namespace == "" || podName == "" {
+			m.l.Debug("Skipping pod metric cleanup for incomplete identity",
+				zap.String("namespace", namespace),
+				zap.String("pod", podName))
+		} else {
+			m.Lock()
+			var deleted int
+			for _, metricObj := range m.registry {
+				deleted += metricObj.DeletePodMetrics(namespace, podName)
+			}
+			m.Unlock()
+			m.l.Debug("Finished pod metric cleanup",
+				zap.String("namespace", namespace),
+				zap.String("pod", podName),
+				zap.Int("deleted", deleted))
+		}
+	}
+
 	ip, err := pod.PrimaryNetIP()
 	if err != nil || ip == nil {
 		m.l.Error("Error getting primary net IP", zap.Any("pod obj", pod), zap.Error(err))

@@ -58,6 +58,20 @@ func (mr *MockMetricVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockMetricVec)(nil).DeleteLabelValues), lvs...)
 }
 
+// DeletePartialMatch mocks base method.
+func (m *MockMetricVec) DeletePartialMatch(labels prometheus.Labels) int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePartialMatch", labels)
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// DeletePartialMatch indicates an expected call of DeletePartialMatch.
+func (mr *MockMetricVecMockRecorder) DeletePartialMatch(labels any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePartialMatch", reflect.TypeOf((*MockMetricVec)(nil).DeletePartialMatch), labels)
+}
+
 // MockCounterVec is a mock of CounterVec interface.
 type MockCounterVec struct {
 	ctrl     *gomock.Controller
@@ -97,6 +111,20 @@ func (m *MockCounterVec) DeleteLabelValues(lvs ...string) bool {
 func (mr *MockCounterVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockCounterVec)(nil).DeleteLabelValues), lvs...)
+}
+
+// DeletePartialMatch mocks base method.
+func (m *MockCounterVec) DeletePartialMatch(labels prometheus.Labels) int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePartialMatch", labels)
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// DeletePartialMatch indicates an expected call of DeletePartialMatch.
+func (mr *MockCounterVecMockRecorder) DeletePartialMatch(labels any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePartialMatch", reflect.TypeOf((*MockCounterVec)(nil).DeletePartialMatch), labels)
 }
 
 // GetMetricWithLabelValues mocks base method.
@@ -175,6 +203,20 @@ func (m *MockGaugeVec) DeleteLabelValues(lvs ...string) bool {
 func (mr *MockGaugeVecMockRecorder) DeleteLabelValues(lvs ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLabelValues", reflect.TypeOf((*MockGaugeVec)(nil).DeleteLabelValues), lvs...)
+}
+
+// DeletePartialMatch mocks base method.
+func (m *MockGaugeVec) DeletePartialMatch(labels prometheus.Labels) int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePartialMatch", labels)
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// DeletePartialMatch indicates an expected call of DeletePartialMatch.
+func (mr *MockGaugeVecMockRecorder) DeletePartialMatch(labels any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePartialMatch", reflect.TypeOf((*MockGaugeVec)(nil).DeletePartialMatch), labels)
 }
 
 // GetMetricWithLabelValues mocks base method.
