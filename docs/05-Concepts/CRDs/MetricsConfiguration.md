@@ -24,7 +24,9 @@ The `MetricsConfiguration` CRD is defined with the following specifications:
   - `destinationLabels`: Represents the destination context labels, such as IP, Pod, port, workload (deployment/replicaset/statefulset/daemonset), and `zone`.
   - `metricName`: Indicates the name of the metric.
   - `sourceLabels`: Represents the source context labels, such as IP, Pod, port, and `zone`.
-  - `ttl`: Represents the time-to-live for the metric.  If there are no metric updates for a particular set of context labels for this duration the metric will be removed from export.  The value of `ttl` must be a valid Golang `time.Duration` string and non-negative.  A zero `ttl` (the default) means that metrics are never removed from export.
+  - `ttl`: Represents the time-to-live for the metric. If there are no metric updates for a particular set of context labels for this duration, a positive `ttl` removes the metric from export. The value must be a valid, non-negative Golang `time.Duration` string.
+
+    An omitted or zero `ttl` uses pod-deletion events to remove Standard advanced metric series that identify the deleted pod with both namespace and pod-name labels. Namespace-only, workload-only, IP-only, and node API-server aggregate series are retained. This cleanup stops Retina from exporting the matching current series; it does not remove existing Prometheus server history. A flow enriched before deletion may still be processed later and recreate a series, so cleanup is not a permanent queue-fencing guarantee.
 
   When `zone` is included in `sourceLabels` or `destinationLabels`, Retina emits `source_zone` / `destination_zone` labels populated from the node's [`topology.kubernetes.io/zone`](https://kubernetes.io/docs/reference/labels-annotations-taints/#topologykubernetesiozone) label. Flows whose zone cannot be resolved are labelled `unknown`.
 

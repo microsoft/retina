@@ -11,6 +11,7 @@ import (
 
 type MetricVec interface {
 	DeleteLabelValues(lvs ...string) bool
+	DeletePartialMatch(labels prometheus.Labels) int
 }
 
 type CounterVec interface {

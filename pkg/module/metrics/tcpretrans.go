@@ -49,6 +49,7 @@ func (t *TCPRetransMetrics) Init(metricName string) {
 		TCPRetransCountDesc,
 		t.getLabels()...,
 	)
+	t.setMetricVector(t.tcpRetransMetrics)
 }
 
 func (t *TCPRetransMetrics) getLabels() []string {

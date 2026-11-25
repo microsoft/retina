@@ -49,6 +49,7 @@ func (t *TCPMetrics) Init(metricName string) {
 		TCPFlagsCountDesc,
 		t.getLabels()...,
 	)
+	t.setMetricVector(t.tcpFlagsMetrics)
 }
 
 func (t *TCPMetrics) getLabels() []string {

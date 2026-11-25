@@ -27,6 +27,65 @@ const (
 	testCfgFile = "../../config/testwith/config.yaml"
 )
 
+func TestPodDeletionRoutesMetricCleanup(t *testing.T) {
+	_, err := log.SetupZapLogger(log.GetDefaultLogOpts())
+	require.NoError(t, err)
+
+	t.Run("cleans metrics for every collector even when the pod has no IP", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		first := NewMockAdvMetricsInterface(ctrl)
+		second := NewMockAdvMetricsInterface(ctrl)
+		first.EXPECT().DeletePodMetrics("ns", "pod").Return(2)
+		second.EXPECT().DeletePodMetrics("ns", "pod").Return(1)
+
+		m := &Module{
+			RWMutex: &sync.RWMutex{},
+			l:       log.Logger().Named("MetricModule"),
+			registry: map[string]AdvMetricsInterface{
+				"first":  first,
+				"second": second,
+			},
+		}
+		pod := common.NewRetinaEndpoint("pod", "ns", nil)
+		m.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, pod))
+	})
+
+	t.Run("rejects invalid identity", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		metric := NewMockAdvMetricsInterface(ctrl)
+		m := &Module{
+			RWMutex: &sync.RWMutex{},
+			l:       log.Logger().Named("MetricModule"),
+			registry: map[string]AdvMetricsInterface{
+				podMetricTestRegistryKey: metric,
+			},
+		}
+		m.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, common.NewRetinaEndpoint("", "ns", nil)))
+		m.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, common.NewRetinaEndpoint("pod", "", nil)))
+	})
+
+	t.Run("IP reuse only protects filter cleanup", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		metric := NewMockAdvMetricsInterface(ctrl)
+		daemonCache := cache.NewMockCacheInterface(ctrl)
+		ip := net.IPv4(10, 0, 0, 1)
+		replacement := common.NewRetinaEndpoint("replacement", "ns", &common.IPAddresses{IPv4: ip})
+		metric.EXPECT().DeletePodMetrics("ns", "deleted").Return(1)
+		daemonCache.EXPECT().GetPodByIP(ip.String()).Return(replacement)
+
+		m := &Module{
+			RWMutex:     &sync.RWMutex{},
+			l:           log.Logger().Named("MetricModule"),
+			registry:    map[string]AdvMetricsInterface{podMetricTestRegistryKey: metric},
+			daemonCache: daemonCache,
+			dirtyPods:   common.NewDirtyCache(),
+		}
+		deleted := common.NewRetinaEndpoint("deleted", "ns", &common.IPAddresses{IPv4: ip})
+		m.PodCallBackFn(cache.NewCacheEvent(cache.EventTypePodDeleted, deleted))
+		assert.Empty(t, m.dirtyPods.GetDeleteList())
+	})
+}
+
 func TestAppendIncludeList(t *testing.T) {
 	log.SetupZapLogger(log.GetDefaultLogOpts())
 	cfg, err := kcfg.GetConfig(testCfgFile)
@@ -597,9 +656,11 @@ func TestModule_Reconcile(t *testing.T) {
 		tt.m.enricher = e
 		tt.m.filterManager = fm
 		tt.m.daemonCache = c
+		tt.m.dirtyPods = common.NewDirtyCache()
 		testRing := container.NewRing(container.Capacity1)
 		testRingReader := container.NewRingReader(testRing, 0)
 		p.EXPECT().Subscribe(gomock.Any(), gomock.Any()).Return("test").AnyTimes()
+		p.EXPECT().Unsubscribe(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		e.EXPECT().ExportReader().AnyTimes().Return(testRingReader)
 
 		if tt.expectNoCalls {
@@ -610,6 +671,10 @@ func TestModule_Reconcile(t *testing.T) {
 		err := tt.m.Reconcile(tt.spec)
 		if err != nil && !tt.expectErr {
 			t.Errorf("unexpected error: %v", err)
+		}
+		if tt.m.ctxCancel != nil {
+			tt.m.ctxCancel()
+			tt.m.wg.Wait()
 		}
 	}
 }

@@ -64,6 +64,7 @@ func (f *ForwardMetrics) Init(metricName string) {
 	default:
 		f.getLogger().Error("unknown metric name", zap.String("name", metricName))
 	}
+	f.setMetricVector(f.forwardMetric)
 	f.metricName = metricName
 }
 

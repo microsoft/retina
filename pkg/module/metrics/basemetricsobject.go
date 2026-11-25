@@ -10,6 +10,8 @@ import (
 
 	api "github.com/microsoft/retina/crd/api/v1alpha1"
 	"github.com/microsoft/retina/pkg/log"
+	metricsinit "github.com/microsoft/retina/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +33,9 @@ type baseMetricInterface interface {
 	isLocalContext() bool
 	// This func is used to track updates to the metric labels. It is called by the child metric object whenever the metric is updated
 	updated(lbs []string)
+	podMetricSelectors(namespace, podName string) []prometheus.Labels
+	setMetricVector(metricVector metricsinit.MetricVec)
+	DeletePodMetrics(namespace, podName string) int
 	getLogger() *log.ZapLogger
 	// Returns the full set of tracked metric labels, this is expensive so should only be used for testing and debugging purposes
 	trackedMetricLabels() [][]string
@@ -38,16 +43,18 @@ type baseMetricInterface interface {
 
 type baseMetricObject struct {
 	*sync.RWMutex
-	advEnable   bool
-	contextMode enrichmentContext
-	ctxOptions  *api.MetricsContextOptions
-	srcCtx      ContextOptionsInterface
-	dstCtx      ContextOptionsInterface
-	l           *log.ZapLogger
-	lastUpdated map[string]updated
-	expireFn    expireFn
-	cancelFn    context.CancelFunc
-	ctx         context.Context
+	advEnable    bool
+	contextMode  enrichmentContext
+	ctxOptions   *api.MetricsContextOptions
+	srcCtx       ContextOptionsInterface
+	dstCtx       ContextOptionsInterface
+	l            *log.ZapLogger
+	lastUpdated  map[string]updated
+	expireFn     expireFn
+	deleteOnPod  bool
+	metricVector metricsinit.MetricVec
+	cancelFn     context.CancelFunc
+	ctx          context.Context
 }
 
 func (b *baseMetricObject) additionalLabels() []string {
@@ -88,6 +95,57 @@ func (b *baseMetricObject) destinationCtx() ContextOptionsInterface {
 
 func (b *baseMetricObject) getLogger() *log.ZapLogger {
 	return b.l
+}
+
+// podMetricSelectors returns local or source/destination namespace-and-pod label
+// matchers for zero-TTL cleanup, excluding contexts that lack either identity label.
+func (b *baseMetricObject) podMetricSelectors(namespace, podName string) []prometheus.Labels {
+	if !b.deleteOnPod || namespace == "" || podName == "" {
+		return nil
+	}
+
+	selector := func(ctx ContextOptionsInterface, prefix string) prometheus.Labels {
+		options, ok := ctx.(*ContextOptions)
+		if !ok || !options.Namespace || !options.Podname {
+			return nil
+		}
+		return prometheus.Labels{
+			prefix + namespaceCtxOption: namespace,
+			prefix + podCtxOption:       podName,
+		}
+	}
+
+	if b.isLocalContext() {
+		if local := selector(b.srcCtx, ""); local != nil {
+			return []prometheus.Labels{local}
+		}
+		return nil
+	}
+
+	selectors := make([]prometheus.Labels, 0, 2)
+	if source := selector(b.srcCtx, sourceCtxPrefix); source != nil {
+		selectors = append(selectors, source)
+	}
+	if destination := selector(b.dstCtx, destinationCtxPrefix); destination != nil {
+		selectors = append(selectors, destination)
+	}
+	return selectors
+}
+
+func (b *baseMetricObject) setMetricVector(metricVector metricsinit.MetricVec) {
+	b.metricVector = metricVector
+}
+
+func (b *baseMetricObject) DeletePodMetrics(namespace, podName string) int {
+	if b.metricVector == nil {
+		return 0
+	}
+
+	var deleted int
+	for _, selector := range b.podMetricSelectors(namespace, podName) {
+		deleted += b.metricVector.DeletePartialMatch(selector)
+	}
+	return deleted
 }
 
 func (b *baseMetricObject) expire(ttl time.Duration) int {
@@ -147,6 +205,7 @@ func newBaseMetricsObject(ctxOptions *api.MetricsContextOptions, fl *log.ZapLogg
 		l:           fl,
 		contextMode: isLocalContext,
 		expireFn:    expireOrInfiniteTTL,
+		deleteOnPod: ttl == 0,
 	}
 
 	if expireOrInfiniteTTL != nil {

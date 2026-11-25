@@ -59,6 +59,7 @@ func (d *DropCountMetrics) Init(metricName string) {
 	default:
 		d.getLogger().Error("unknown metric name", zap.String("metricName", metricName))
 	}
+	d.setMetricVector(d.dropMetric)
 	d.metricName = metricName
 }
 

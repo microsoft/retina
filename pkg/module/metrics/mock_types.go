@@ -89,6 +89,20 @@ func (mr *MockAdvMetricsInterfaceMockRecorder) Clean() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clean", reflect.TypeOf((*MockAdvMetricsInterface)(nil).Clean))
 }
 
+// DeletePodMetrics mocks base method.
+func (m *MockAdvMetricsInterface) DeletePodMetrics(namespace, podName string) int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePodMetrics", namespace, podName)
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// DeletePodMetrics indicates an expected call of DeletePodMetrics.
+func (mr *MockAdvMetricsInterfaceMockRecorder) DeletePodMetrics(namespace, podName any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePodMetrics", reflect.TypeOf((*MockAdvMetricsInterface)(nil).DeletePodMetrics), namespace, podName)
+}
+
 // Init mocks base method.
 func (m *MockAdvMetricsInterface) Init(metricName string) {
 	m.ctrl.T.Helper()
