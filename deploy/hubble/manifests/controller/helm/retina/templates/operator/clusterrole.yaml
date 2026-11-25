@@ -28,7 +28,9 @@ rules:
     resources:
       - pods
       - namespaces
+      {{- if dig "windowsOnlyEndpoints" "enabled" false .Values.operator }}
       - nodes
+      {{- end }}
     verbs:
       - get
       - list
