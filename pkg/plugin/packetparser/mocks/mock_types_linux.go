@@ -91,18 +91,18 @@ func (m *Mockfilter) EXPECT() *MockfilterMockRecorder {
 	return m.recorder
 }
 
-// Add mocks base method.
-func (m *Mockfilter) Add(info *tc.Object) error {
+// Replace mocks base method.
+func (m *Mockfilter) Replace(info *tc.Object) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Add", info)
+	ret := m.ctrl.Call(m, "Replace", info)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Add indicates an expected call of Add.
-func (mr *MockfilterMockRecorder) Add(info any) *gomock.Call {
+// Replace indicates an expected call of Replace.
+func (mr *MockfilterMockRecorder) Replace(info any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*Mockfilter)(nil).Add), info)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replace", reflect.TypeOf((*Mockfilter)(nil).Replace), info)
 }
 
 // Mocknltc is a mock of nltc interface.
