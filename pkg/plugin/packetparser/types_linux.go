@@ -6,6 +6,8 @@ package packetparser
 import (
 	"context"
 	"sync"
+	"time"
+	"unsafe"
 
 	kcfg "github.com/microsoft/retina/pkg/config"
 
@@ -50,6 +52,27 @@ type interfaceType string
 const (
 	Veth   interfaceType = "veth"
 	Device interfaceType = "device"
+)
+
+const (
+	// eventFlushInterval is the maximum time that an event waits in the kernel buffer.
+	// The kernel does not wake the reader for each event, so the reader also reads the
+	// buffer each time this interval expires.
+	eventFlushInterval = 100 * time.Millisecond
+	// wakeupDivisor sets the quantity of unread data at which the kernel wakes the reader:
+	// 1/wakeupDivisor of the buffer size. For a perf buffer, the size is that of one CPU.
+	wakeupDivisor = 4
+	// maxPendingRecords is the maximum number of records that the kernel holds before it
+	// wakes the reader, and the maximum size of a batch. The two together fit in the
+	// records channel. Thus the reader does not drop the records of one flush interval
+	// when the workers have the capacity for the event rate.
+	maxPendingRecords = buffer / 2
+
+	eventSize = int(unsafe.Sizeof(packetparserPacket{}))
+	// A perf buffer record has an 8-byte header and a 4-byte size before the event.
+	// A ring buffer record has an 8-byte header. The kernel pads the two to 8 bytes.
+	perfRecordSize    = 8 + (4+eventSize+7)/8*8
+	ringBufRecordSize = (8 + eventSize + 7) / 8 * 8
 )
 
 const (
@@ -152,6 +175,10 @@ type packetParser struct {
 	hostEgressInfo      *ebpf.ProgramInfo
 	wg                  sync.WaitGroup
 	recordsChannel      chan perfRecord
+	// batch holds the records that readData read in the current flush interval, and
+	// batchStart is the time of its first record. Only the reader goroutine uses them.
+	batch      []perfRecord
+	batchStart time.Time
 	// stopReporter cancels reportLostEvents and reporterWg waits for it to exit. Stop uses
 	// both before closing objs, since the reporter reads a map from objs.
 	stopReporter    context.CancelFunc

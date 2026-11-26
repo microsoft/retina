@@ -22,6 +22,7 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/microsoft/retina/pkg/loader"
 	"github.com/microsoft/retina/pkg/log"
+	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
 	"github.com/microsoft/retina/pkg/plugin/ebpftest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -681,7 +682,8 @@ func compileAndLoadVariantBase(t *testing.T, opts compileOpts) (*packetparserObj
 		fmt.Sprintf("-I%s/../conntrack/_cprog/", dir),
 	}
 	if opts.enableRingBuf {
-		cflags = append(cflags, "-DUSE_RING_BUFFER", "-DRING_BUFFER_SIZE=4096")
+		cflags = append(cflags, "-DUSE_RING_BUFFER", "-DRING_BUFFER_SIZE=4096",
+			fmt.Sprintf("-DRING_BUFFER_WAKEUP_SIZE=%d", ringBufWakeupSize(4096)))
 	}
 
 	err = loader.CompileEbpf(context.Background(), cflags...)
@@ -1268,7 +1270,7 @@ func TestRingBufReaderWrapper(t *testing.T) {
 		samplingRate:     1,
 	})
 
-	wrapper := &ringBufReaderWrapper{reader: reader}
+	wrapper := newRingBufReaderWrapper(reader)
 
 	srcIP := net.ParseIP("10.0.0.1")
 	dstIP := net.ParseIP("10.0.0.2")
@@ -1286,7 +1288,8 @@ func TestRingBufReaderWrapper(t *testing.T) {
 	// Run program to generate an event
 	ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
 
-	// Test Read() behavior
+	// Test Read() behavior. One event is below the wakeup size, so the read
+	// deadline delivers it.
 	rec, err := wrapper.Read()
 	require.NoError(t, err)
 	require.NotNil(t, rec.RawSample)
@@ -1298,6 +1301,96 @@ func TestRingBufReaderWrapper(t *testing.T) {
 	// After closing, Read() should return ringbuf.ErrClosed
 	_, err = wrapper.Read()
 	assert.ErrorIs(t, err, ringbuf.ErrClosed)
+}
+
+// TestRingBufWakeupSize asserts that the program wakes a blocked reader only when the
+// unread data crosses RING_BUFFER_WAKEUP_SIZE.
+func TestRingBufWakeupSize(t *testing.T) {
+	if err := ensureRingBufKernelSupported(); err != nil {
+		t.Skipf("ring buffer not supported: %v", err)
+	}
+
+	// RING_BUFFER_SIZE is 4096 for this variant.
+	wakeupSize := int(ringBufWakeupSize(4096))
+	objs, reader := compileAndLoadRingBufVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+
+	pkt := ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   net.ParseIP("10.0.97.1"),
+		DstIP:   net.ParseIP("10.0.97.2"),
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  1000,
+	})
+
+	// The reader has no deadline, so only a wakeup from the program unblocks Read.
+	done := make(chan error, 1)
+	go func() {
+		_, err := reader.Read()
+		done <- err
+	}()
+
+	// The largest number of records that does not reach the wakeup size.
+	belowWakeupSize := (wakeupSize - 1) / ringBufRecordSize
+	for range belowWakeupSize {
+		ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("reader woke below the wakeup size: %v", err)
+	case <-time.After(perfReaderTimeout):
+	}
+
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, pkt)
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(perfReaderTimeout):
+		t.Fatal("reader did not wake when the unread data crossed the wakeup size")
+	}
+}
+
+// TestPerfReaderWrapperFlush asserts that an event below the perf buffer watermark
+// reaches the reader when the flush interval expires.
+func TestPerfReaderWrapperFlush(t *testing.T) {
+	objs, _ := compileAndLoadVariant(t, compileOpts{
+		bypassFilter:     1,
+		enableConntrack:  false,
+		aggregationLevel: 0,
+		samplingRate:     1,
+	})
+
+	reader, err := plugincommon.NewPerfReaderWithWatermark(log.Logger().Named("test"), objs.RetinaPacketparserEvents, perCPUBuffer, 1, wakeupDivisor, maxPendingRecords*perfRecordSize)
+	require.NoError(t, err)
+	created := time.Now()
+	wrapper := newPerfReaderWrapper(reader)
+	t.Cleanup(func() { wrapper.Close() }) //nolint:errcheck // test cleanup
+
+	ebpftest.RunProgram(t, objs.EndpointIngressFilter, ebpftest.BuildTCPPacket(ebpftest.TCPPacketOpts{
+		SrcIP:   net.ParseIP("10.0.96.1"),
+		DstIP:   net.ParseIP("10.0.96.2"),
+		SrcPort: 12345,
+		DstPort: 80,
+		SYN:     true,
+		SeqNum:  1000,
+	}))
+
+	start := time.Now()
+	rec, err := wrapper.Read()
+	require.NoError(t, err)
+	require.NotNil(t, rec.RawSample)
+	assert.Less(t, time.Since(start), perfReaderTimeout, "the flush interval must deliver the event")
+	// Without the watermark, the kernel wakes the reader for the event and Read returns immediately.
+	assert.GreaterOrEqual(t, time.Since(created), eventFlushInterval/2, "the kernel must not wake the reader for one event")
+
+	// The next read reports the end of the flush interval and starts a new one.
+	_, err = wrapper.Read()
+	require.ErrorIs(t, err, os.ErrDeadlineExceeded)
 }
 
 // readDropCounter sums the per-CPU kernel drop counter directly from the map.

@@ -61,9 +61,31 @@ func RCodeToFlow(rCode string) uint32 {
 // Not enforced, but max and min should be a power of 2.
 // The allocated size will be a multiple of pagesize determined at runtime.
 func NewPerfReader(l *log.ZapLogger, m *ebpf.Map, max, min int) (*perf.Reader, error) {
+	return newPerfReader(l, m, max, min, 0, 0)
+}
+
+// NewPerfReaderWithWatermark is the same as NewPerfReader, but the kernel does not wake the reader for each record.
+// The kernel wakes the reader each time a CPU writes 1/watermarkDivisor of the per-CPU buffer size.
+// The watermark is smaller when that is necessary to keep the data that all CPUs can hold below
+// their watermark at maxPendingBytes or less.
+// The caller must set a read deadline on the reader. Without a deadline, records below the watermark stay in the buffer.
+func NewPerfReaderWithWatermark(l *log.ZapLogger, m *ebpf.Map, maxPages, minPages, watermarkDivisor, maxPendingBytes int) (*perf.Reader, error) {
+	// The reader has one buffer for each CPU.
+	numCPU, err := ebpf.PossibleCPU()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the number of CPUs: %w", err)
+	}
+	return newPerfReader(l, m, maxPages, minPages, watermarkDivisor, maxPendingBytes/numCPU)
+}
+
+func newPerfReader(l *log.ZapLogger, m *ebpf.Map, maxPages, minPages, watermarkDivisor, maxWatermark int) (*perf.Reader, error) {
 	var enomem error = syscall.ENOMEM
-	for i := max; i >= min; i = i / 2 {
-		r, err := perf.NewReader(m, i*os.Getpagesize())
+	for i := maxPages; i >= minPages; i /= 2 {
+		var opts perf.ReaderOptions
+		if watermarkDivisor > 0 {
+			opts.Watermark = min(i*os.Getpagesize()/watermarkDivisor, maxWatermark)
+		}
+		r, err := perf.NewReaderWithOptions(m, i*os.Getpagesize(), opts)
 		if err == nil {
 			l.Info("perf reader created", zap.Any("Map", m.String()), zap.Int("PageSize", os.Getpagesize()), zap.Int("BufferSize", i*os.Getpagesize()))
 			return r, nil

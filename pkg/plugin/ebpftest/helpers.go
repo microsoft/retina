@@ -195,9 +195,11 @@ func ReadPerCPUMap[T any](t *testing.T, m *ebpf.Map, key uint32) (T, bool) {
 	return zero, false
 }
 
-// ReadRingBufEvent reads one ringbuf record from the reader within the given timeout,
-// decodes it into T using binary.Read (little-endian), and returns it.
-// Returns (zero, false) if the deadline expires without an event.
+// ReadRingBufEvent reads one ringbuf record from the reader, decodes it into T using
+// binary.Read (little-endian), and returns it.
+// It does not wait for a record. It returns (zero, false) if the buffer has no record
+// at the time of the call, or if the read does not return within the given timeout.
+// After this call, the subsequent Read call on rb can return ringbuf.ErrFlushed.
 func ReadRingBufEvent[T any](t *testing.T, rb *ringbuf.Reader, timeout time.Duration) (T, bool) {
 	t.Helper()
 
@@ -205,6 +207,10 @@ func ReadRingBufEvent[T any](t *testing.T, rb *ringbuf.Reader, timeout time.Dura
 		rec ringbuf.Record
 		err error
 	}
+
+	// A program can write records without a wakeup of the reader.
+	// Flush makes Read return the records that are in the buffer now.
+	require.NoError(t, rb.Flush())
 
 	// ringbuf.Read is blocking, so we run it in a goroutine to support timeout.
 	// When the test ends or rb is closed, this should unblock.
@@ -216,6 +222,11 @@ func ReadRingBufEvent[T any](t *testing.T, rb *ringbuf.Reader, timeout time.Dura
 
 	select {
 	case res := <-ch:
+		if errors.Is(res.err, ringbuf.ErrFlushed) {
+			// The buffer had no record.
+			var zero T
+			return zero, false
+		}
 		require.NoError(t, res.err)
 		var event T
 		err := binary.Read(bytes.NewReader(res.rec.RawSample), binary.LittleEndian, &event)

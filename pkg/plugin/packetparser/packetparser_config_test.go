@@ -14,6 +14,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRingBufWakeupSize_HoldsAtMostMaxPendingRecords(t *testing.T) {
+	const mib = 1024 * 1024
+	tests := []struct {
+		ringSize uint32
+		want     uint32
+	}{
+		{ringSize: 4096, want: 1024},             // 1/4 of the ring
+		{ringSize: 1 * mib, want: 256 * 1024},    // 1/4 of the ring
+		{ringSize: 8 * mib, want: 512 * 1024},    // limited by maxPendingRecords
+		{ringSize: 1024 * mib, want: 512 * 1024}, // limited by maxPendingRecords
+	}
+	for _, tt := range tests {
+		got := ringBufWakeupSize(tt.ringSize)
+		assert.Equal(t, tt.want, got, "ring size %d", tt.ringSize)
+		assert.LessOrEqual(t, int(got)/ringBufRecordSize, maxPendingRecords, "ring size %d", tt.ringSize)
+	}
+}
+
 func TestValidateRingBufferSize(t *testing.T) {
 	const maxSize = 1 * 1024 * 1024 * 1024 // 1GB
 	intPageSize := os.Getpagesize()
