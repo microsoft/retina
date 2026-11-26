@@ -29,7 +29,7 @@ RUN --mount=type=cache,target="/root/.cache/go-build" \
 # minimal libs stage — provides only the system libraries needed by the CGO-enabled binary,
 # without the bloat of the full Go SDK image (python, gcc, systemd, etc.)
 # skopeo inspect docker://mcr.microsoft.com/azurelinux/base/core:3.0 --format "{{.Name}}@{{.Digest}}"
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS libs
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261120@sha256:a333b3233076d8b47d63237760e7b36576c0fe47fbf670d5d3517d2fd6fe5030 AS libs
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     expat-2.10.0-1.azl3 \
@@ -57,7 +57,7 @@ COPY --from=builder /workspace/kubectl-retina .
 # Final image must be $TARGETPLATFORM (default), not $BUILDPLATFORM — the
 # kubectl-retina binary is cross-compiled for the target arch and would fail
 # to run inside a wrong-arch base image.
-FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261116@sha256:3d16d8799f71a78f5bddb3b7cda4a57df1f40ecfa58bac89933010596aa86880 AS shell-target
+FROM mcr.microsoft.com/azurelinux/base/core:3.0.20261120@sha256:a333b3233076d8b47d63237760e7b36576c0fe47fbf670d5d3517d2fd6fe5030 AS shell-target
 # Keep fixed RPM pins until the base image includes them; verify both architectures before removing.
 RUN tdnf install -y \
     expat-2.10.0-1.azl3 \
