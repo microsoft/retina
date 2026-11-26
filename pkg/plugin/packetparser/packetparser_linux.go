@@ -715,7 +715,7 @@ func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceT
 		Msg: tc.Msg{
 			Family:  unix.AF_UNSPEC,
 			Ifindex: uint32(iface.Index),
-			Handle:  0,                                                                // arbitrary handle to distinguish between ingress and egress filters
+			Handle:  tcFilterHandle,
 			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinIngress),                  // nolint:gomnd // same major component (0xffff) as clsact
 			Info:    netlink.MakeHandle(tcFilterPriority, vnl.Swap16(unix.ETH_P_ALL)), // set the filter priority and protocol to ETH_P_ALL
 		},
@@ -728,7 +728,8 @@ func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceT
 			},
 		},
 	}
-	if err := getFilter(rtnl).Add(&ingressFilter); err != nil && !errors.Is(err, os.ErrExist) {
+	// Replace, not Add: tc filters outlive the agent, so after a crash this swaps out the stale program.
+	if err := getFilter(rtnl).Replace(&ingressFilter); err != nil {
 		p.l.Error("could not add bpf ingress filter to qdisc", zap.String("interface", iface.Name), zap.Error(err))
 		return
 	}
@@ -737,7 +738,7 @@ func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceT
 		Msg: tc.Msg{
 			Family:  unix.AF_UNSPEC,
 			Ifindex: uint32(iface.Index),
-			Handle:  1,
+			Handle:  tcFilterHandle,
 			Parent:  helper.BuildHandle(0xFFFF, tc.HandleMinEgress),                   // nolint:gomnd // ignore
 			Info:    netlink.MakeHandle(tcFilterPriority, vnl.Swap16(unix.ETH_P_ALL)), // nolint:gomnd // ignore
 		},
@@ -750,7 +751,7 @@ func (p *packetParser) attachViaTC(iface netlink.LinkAttrs, ifaceType interfaceT
 			},
 		},
 	}
-	if err := getFilter(rtnl).Add(&egressFilter); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := getFilter(rtnl).Replace(&egressFilter); err != nil {
 		p.l.Error("could not add bpf egress filter to qdisc", zap.String("interface", iface.Name), zap.Error(err))
 		return
 	}

@@ -43,6 +43,9 @@ const (
 	bpfObjectFileName     string = "packetparser_bpf.o"
 	dynamicHeaderFileName string = "dynamic.h"
 	tcFilterPriority      uint16 = 0x1
+	// tcFilterHandle is retina's own slot on the clsact hooks. It is not 1 (Cilium's legacy TC handle), so
+	// Replace swaps only a filter retina attached itself (e.g. one left by a crash), not another tool's.
+	tcFilterHandle uint32 = 0x52544e41 // "RTNA"
 )
 
 type interfaceType string
@@ -112,7 +115,7 @@ type qdisc interface {
 
 // tc filter interface
 type filter interface {
-	Add(info *tc.Object) error
+	Replace(info *tc.Object) error
 }
 
 // netlink tc interface
