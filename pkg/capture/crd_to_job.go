@@ -202,7 +202,7 @@ func (translator *CaptureToPodTranslator) initJobTemplate(ctx context.Context, c
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
 									Add: []corev1.Capability{
-										"NET_ADMIN", "SYS_ADMIN",
+										"NET_ADMIN", "SYS_ADMIN", "NET_RAW",
 									},
 								},
 							},
