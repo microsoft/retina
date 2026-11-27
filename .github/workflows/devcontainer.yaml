@@ -34,7 +34,12 @@ jobs:
             clang --version
             llvm-strip --version
             go version
-            EXPECTED_GO=$(grep '^go ' go.mod | awk '{print $2}')
+            # go.mod selects the toolchain line if it exists, otherwise the
+            # go line.
+            EXPECTED_GO=$(awk '/^toolchain go[0-9]/ {sub(/^go/, "", $2); print $2; exit}' go.mod)
+            if [ -z "$EXPECTED_GO" ]; then
+              EXPECTED_GO=$(grep '^go ' go.mod | awk '{print $2}')
+            fi
             # GOTOOLCHAIN=local reports the installed Go. Without it, go
             # downloads the go.mod version and the check always passes.
             ACTUAL_GO=$(GOTOOLCHAIN=local go version | grep -oP '\d+\.\d+\.\d+')
