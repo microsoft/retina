@@ -36,7 +36,6 @@ import (
 	"github.com/microsoft/retina/pkg/log"
 	"github.com/microsoft/retina/pkg/metrics"
 	plugincommon "github.com/microsoft/retina/pkg/plugin/common"
-	"github.com/microsoft/retina/pkg/plugin/conntrack"
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_amd64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/_arm64"                            // nolint
 	_ "github.com/microsoft/retina/pkg/plugin/lib/common/libbpf/_include/asm"        // nolint
@@ -54,7 +53,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/ -I../conntrack/_cprog/
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go@master -cflags "-g -O2 -Wall -D__TARGET_ARCH_${GOARCH} -Wall" -target ${GOARCH} -type packet -type ct_v4_key -type ct_entry packetparser ./_cprog/packetparser.c -- -I../lib/_${GOARCH} -I../lib/common/libbpf/_src -I../lib/common/libbpf/_include/linux -I../lib/common/libbpf/_include/uapi/linux -I../lib/common/libbpf/_include/asm -I../filter/_cprog/
 var (
 	errNoOutgoingLinks          = errors.New("could not determine any outgoing links")
 	errRingBufKernelTooOld      = errors.New("ring buffer requires newer kernel")
@@ -107,24 +106,21 @@ func (p *packetParser) Generate(ctx context.Context) error {
 	}
 	st = fmt.Sprintf("#define BYPASS_LOOKUP_IP_OF_INTEREST %d\n", bypassLookupIPOfInterest)
 
-	conntrackMetrics := 0
 	// Check if packetparser has Conntrack metrics enabled.
+	// conntrack.h and packetparser.c test ENABLE_CONNTRACK_METRICS with #ifdef, so
+	// the BPF programs maintain the conntrack counters for 0 and for 1. The option
+	// controls the conntrack gauges of the GC loop.
+	conntrackMetrics := 0
 	if p.cfg.EnableConntrackMetrics {
 		p.l.Info("conntrack metrics enabled")
 		conntrackMetrics = 1
-
-		// Process packetparser dynamic.h conntrack metrics definition.
-		st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
 	}
+	st += fmt.Sprintf("#define ENABLE_CONNTRACK_METRICS %d\n", conntrackMetrics)
 
-	// Generate the conntrack dynamic header unconditionally: it defines
-	// CT_REPORT_INTERVAL, which conntrack.c always requires.
+	// Process conntrack report interval.
 	reportInterval := uint32(p.cfg.ConntrackReportInterval.Seconds())
 	p.l.Info("conntrack report interval", zap.Uint32("seconds", reportInterval))
-	ctDynamicHeaderPath := conntrack.BuildDynamicHeaderPath()
-	if err = conntrack.GenerateDynamic(ctx, ctDynamicHeaderPath, conntrackMetrics, reportInterval); err != nil {
-		return errors.Wrap(err, "failed to generate dynamic header for conntrack")
-	}
+	st += fmt.Sprintf("#define CT_REPORT_INTERVAL %d\n", reportInterval)
 
 	// Process packetparser data aggregation level.
 	p.l.Info("data aggregation level", zap.String("level", p.cfg.DataAggregationLevel.String()))
@@ -185,7 +181,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 	arch := runtime.GOARCH
 	archLibDir := fmt.Sprintf("-I%s/../lib/_%s", dir, arch)
 	filterDir := fmt.Sprintf("-I%s/../filter/_cprog/", dir)
-	conntrackDir := fmt.Sprintf("-I%s/../conntrack/_cprog/", dir)
 	libbpfSrcDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_src", dir)
 	libbpfIncludeLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/linux", dir)
 	libbpfIncludeUapiLinuxDir := fmt.Sprintf("-I%s/../lib/common/libbpf/_include/uapi/linux", dir)
@@ -207,7 +202,6 @@ func (p *packetParser) Compile(ctx context.Context) error {
 		libbpfIncludeLinuxDir,
 		libbpfIncludeUapiLinuxDir,
 		filterDir,
-		conntrackDir,
 	}
 
 	if p.cfg.PacketParserRingBuffer.IsEnabled() {
@@ -338,6 +332,13 @@ func (p *packetParser) Init() error {
 }
 
 func (p *packetParser) Start(ctx context.Context) error {
+	// The conntrack GC loop runs whenever the plugin is enabled, also when pod level is disabled.
+	stopConntrackGC, gcErr := startConntrackGC(ctx, p.l, p.cfg.EnableConntrackMetrics)
+	if gcErr != nil {
+		return errors.Wrap(gcErr, "failed to start conntrack GC")
+	}
+	p.stopConntrackGC = stopConntrackGC
+
 	if !p.cfg.EnablePodLevel {
 		p.l.Warn("packet parser and latency plugin will not start because pod level is disabled")
 		return nil
@@ -421,6 +422,13 @@ func (p *packetParser) Stop() error {
 		p.stopReporter()
 		p.reporterWg.Wait()
 		p.l.Debug("Stopped lost event reporter")
+	}
+
+	// Stop the conntrack GC loop and wait for it to exit.
+	if p.stopConntrackGC != nil {
+		p.stopConntrackGC()
+		p.stopConntrackGC = nil
+		p.l.Debug("Stopped conntrack GC")
 	}
 
 	// Stop map and progs.
