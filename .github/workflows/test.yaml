@@ -18,13 +18,105 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-windows:
-    name: Test Windows Unit Tests
-    runs-on: windows-2022
-    timeout-minutes: 20
+  test-windows-build:
+    name: Build Windows Test Binaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build shared Windows binaries
+        run: make build-windows-binaries GOARCH=amd64 TAG=${{ github.sha }} APP_INSIGHTS_ID=
+
+      - name: Upload Windows test binaries
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-test-binaries
+          path: output/windows_amd64/
+          if-no-files-found: error
+          retention-days: 1
+
+  test-windows-images:
+    name: Test Windows Image (${{ matrix.year }})
+    needs: test-windows-build
+    runs-on: windows-${{ matrix.year }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        year: ["2022", "2025"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download Windows test binaries
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-test-binaries
+          path: output/windows_amd64/
+
+      - name: Install GNU Make
+        run: choco install make --no-progress --yes
+
+      - name: Ensure Docker daemon is running
+        shell: pwsh
+        run: |
+          $timeout = 120
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          while ($timer.Elapsed.TotalSeconds -lt $timeout) {
+            $svc = Get-Service docker -ErrorAction SilentlyContinue
+            if ($svc -and $svc.Status -ne 'Running') {
+              Start-Service docker -ErrorAction SilentlyContinue
+            }
+            $result = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "Docker daemon is ready"
+              return
+            }
+            Write-Host "Waiting for Docker daemon to start..."
+            Start-Sleep -Seconds 5
+          }
+          throw "Docker daemon failed to start within $timeout seconds"
+
+      - name: Build Windows image without publishing
+        shell: bash
+        run: |
+          make retina-image-win \
+            IMAGE_NAMESPACE=${{ github.repository }} \
+            WINDOWS_YEARS=${{ matrix.year }} \
+            BINARIES_PATH=output/windows_amd64 \
+            REPO_PATH=. \
+            TAG=${{ github.sha }}
+
+      - name: Verify registry hardening in the built image
+        shell: bash
+        run: |
+          image="ghcr.io/${{ github.repository }}/retina-agent:${{ github.sha }}-windows-ltsc${{ matrix.year }}-amd64"
+          docker run --rm "$image" powershell.exe -NoProfile -NonInteractive -Command '$ErrorActionPreference="Stop"; foreach ($key in @("HKLM:\Software\Microsoft\Cryptography\Wintrust\Config", "HKLM:\Software\Wow6432Node\Microsoft\Cryptography\Wintrust\Config")) { if ((Get-ItemProperty -LiteralPath $key -Name EnableCertPaddingCheck).EnableCertPaddingCheck -ne 1) { throw "Registry hardening missing: $key" } }; Write-Output "Registry hardening verified"'
+
+  test-windows:
+    name: Test Windows Unit Tests (${{ matrix.year }})
+    runs-on: windows-${{ matrix.year }}
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        year: ["2022", "2025"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test Windows installer recovery
+        shell: pwsh
+        run: ./test/e2e/tools/event-writer/install-ebpf-xdp.Tests.ps1
 
       - name: Setup Go
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0

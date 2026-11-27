@@ -12,6 +12,8 @@ import (
 
 	kubernetes "github.com/microsoft/retina/test/e2e/framework/kubernetes"
 	prom "github.com/microsoft/retina/test/e2e/framework/prometheus"
+	k8sclient "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -45,6 +47,7 @@ const (
 )
 
 type ValidateWinBpfMetric struct {
+	Year                      string
 	KubeConfigFilePath        string
 	EbpfXdpDeamonSetNamespace string
 	EbpfXdpDeamonSetName      string
@@ -57,7 +60,6 @@ type ValidateWinBpfMetric struct {
 }
 
 func (v *ValidateWinBpfMetric) GetPromMetrics() (string, error) {
-	retinaLabelSelector := "k8s-app=retina"
 	var promOutput string
 	var err error
 	attempts := 10
@@ -476,7 +478,15 @@ func (v *ValidateWinBpfMetric) Run() error {
 	}
 	slog.Info("Non HPC Pod is ready")
 
-	targetNodeName, err := kubernetes.GetPodNodeName(v.KubeConfigFilePath, v.NonHpcAppNamespace, v.NonHpcPodName)
+	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
+	if err != nil {
+		return fmt.Errorf("building kubeconfig: %w", err)
+	}
+	client, err := k8sclient.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("creating Kubernetes client: %w", err)
+	}
+	targetNodeName, err := validateWorkloadNode(context.TODO(), client, v.NonHpcAppNamespace, v.NonHpcPodName, v.Year)
 	if err != nil {
 		return fmt.Errorf("getting Non HPC Pod node: %w", err)
 	}

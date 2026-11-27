@@ -10,6 +10,7 @@ updates:
       - "/test/image"
       - "/hack/tools/kapinger"
       - "/hack/tools/toolbox"
+      - "/hack/windows"
     schedule:
       interval: "weekly"
     reviewers:

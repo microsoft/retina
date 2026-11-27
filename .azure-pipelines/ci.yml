@@ -209,49 +209,49 @@ extends:
                 env:
                   APP_INSIGHTS_ID: $(appInsightsId)
 
-          - job: retina_windows
-            displayName: Agent Image - Windows 2022
-            dependsOn: windows_binaries
-            timeoutInMinutes: 60
-            pool:
-              type: docker
-              os: windows
-            variables:
-              ob_outputDirectory: $(Build.SourcesDirectory)/out
-              ob_git_checkout: true
-            steps:
-              # The drop of the windows_binaries job holds windows_amd64/*.exe.
-              # OneBranch docker jobs check the repo out to s/dst, and that
-              # directory is the docker build context.
-              - task: DownloadPipelineArtifact@2
-                displayName: Download Windows binaries
-                inputs:
-                  artifact: drop_build_windows_binaries
-                  targetPath: $(Build.SourcesDirectory)/dst/output
-              - ${{ if or(eq(parameters.e2eMode, 'Publish branch images and run E2E'), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-                - task: onebranch.pipeline.containercontrol@1
-                  displayName: Login to ACR
+          - ${{ each year in split('2022,2025', ',') }}:
+            - job: retina_windows_${{ year }}
+              displayName: Agent Image - Windows ${{ year }}
+              dependsOn: windows_binaries
+              timeoutInMinutes: 60
+              pool:
+                type: docker
+                os: windows
+                hostVersion:
+                  version: ${{ year }}
+                  network: KS1
+              variables:
+                ob_outputDirectory: $(Build.SourcesDirectory)/out
+                ob_git_checkout: true
+              steps:
+                # Both images consume the same prebuilt windows_amd64/*.exe.
+                - task: DownloadPipelineArtifact@2
+                  displayName: Download Windows binaries
                   inputs:
-                    command: login
-                    endpoint: Azure Container Networking - ACR Public Service Connection
-              - task: onebranch.pipeline.imagebuildinfo@1
-                displayName: Build retina-agent windows/amd64
-                inputs:
-                  dockerFileRelPath: controller/Dockerfile.windows-2022
-                  dockerFileContextPath: .
-                  registry: $(ACR_NAME)
-                  repositoryName: $(imageNamespace)/retina-agent
-                  build_tag: $(TAG)-windows-ltsc2022-amd64-$(System.JobAttempt)
-                  arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc2022 --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
-                  enable_network: true
-                  enable_service_tree_acr_path: false
-                  ${{ if or(eq(parameters.e2eMode, 'Publish branch images and run E2E'), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
-                    enable_acr_push: true
-                    endpoint: Azure Container Networking - ACR Public Service Connection
-                    # The template saves every pushed image with `docker save`.
-                    # The Windows image is 5 GB, so skip the gzip pass.
-                    compress: false
-                    saveImageToPath: retina-agent-$(TAG)-windows-ltsc2022-amd64.tar
+                    artifact: drop_build_windows_binaries
+                    targetPath: $(Build.SourcesDirectory)/dst/output
+                - ${{ if or(eq(parameters.e2eMode, 'Publish branch images and run E2E'), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                  - task: onebranch.pipeline.containercontrol@1
+                    displayName: Login to ACR
+                    inputs:
+                      command: login
+                      endpoint: Azure Container Networking - ACR Public Service Connection
+                - task: onebranch.pipeline.imagebuildinfo@1
+                  displayName: Build retina-agent windows/amd64
+                  inputs:
+                    dockerFileRelPath: controller/Dockerfile.windows-${{ year }}
+                    dockerFileContextPath: .
+                    registry: $(ACR_NAME)
+                    repositoryName: $(imageNamespace)/retina-agent
+                    build_tag: $(TAG)-windows-ltsc${{ year }}-amd64-$(System.JobAttempt)
+                    arguments: --platform windows/amd64 --target agent-win --build-arg GOOS=windows --build-arg GOARCH=amd64 --build-arg OS_VERSION=ltsc${{ year }} --build-arg REPO_PATH=. --build-arg BINARIES_PATH=output/windows_amd64
+                    enable_network: true
+                    enable_service_tree_acr_path: false
+                    ${{ if or(eq(parameters.e2eMode, 'Publish branch images and run E2E'), startsWith(variables['Build.SourceBranch'], 'refs/heads/gh-readonly-queue/')) }}:
+                      enable_acr_push: true
+                      endpoint: Azure Container Networking - ACR Public Service Connection
+                      compress: false
+                      saveImageToPath: retina-agent-$(TAG)-windows-ltsc${{ year }}-amd64.tar
 
           # The event writer is a native Windows build. The WDK and the Windows
           # SDK come from NuGet packages, so the Visual Studio 2022 container
@@ -482,7 +482,8 @@ extends:
                       for component in retina operator shell kubectl-retina; do
                         retry_manifest "$component" make manifest COMPONENT="$component" \
                           IMAGE_REGISTRY="$registry" IMAGE_NAMESPACE="$ns" TAG="$tag" \
-                          MANIFEST_TAG="$source_tag" MANIFEST_CREATE=hack/scripts/oras-index.sh
+                          MANIFEST_TAG="$source_tag" MANIFEST_CREATE=hack/scripts/oras-index.sh \
+                          WINDOWS_YEARS="2025 2022"
                       done
                       # The event-writer job tags by attempt, so publish its newest
                       # attempt under the source tag consumed by E2E and scale.
@@ -514,7 +515,9 @@ extends:
                       # Keep the E2E tag independent of the pipeline's build TAG.
                       export TAG="${E2E_IMAGE_TAG:?E2E image tag is required}"
                       export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-                      go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1 -args \
+                      echo "Running E2E with WS2022 and WS2025 pools in one cluster"
+                      go test -v ./test/e2e/. -run '^TestE2ERetina$' -timeout 75m -tags=e2e -count=1 -args \
+                        -windows-year=both \
                         -image-tag="$TAG" \
                         -image-registry="$IMAGE_REGISTRY" \
                         -image-namespace="$IMAGE_NAMESPACE"
@@ -526,7 +529,8 @@ extends:
                     scriptType: bash
                     scriptLocation: inlineScript
                     inlineScript: |
-                      if az group exists --name "$(CLUSTER_NAME)" 2>/dev/null | grep -q true; then
-                        echo "Deleting resource group $(CLUSTER_NAME)..."
-                        az group delete --name "$(CLUSTER_NAME)" --yes --no-wait || true
+                      group="$(CLUSTER_NAME)"
+                      if az group exists --name "$group" 2>/dev/null | grep -q true; then
+                        echo "Deleting resource group $group..."
+                        az group delete --name "$group" --yes --no-wait
                       fi

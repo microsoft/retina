@@ -44,6 +44,7 @@ func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespac
 	})
 	if err != nil {
 		log.Printf("error listing pods: %s\n", err)
+		return
 	}
 
 	// Iterate over the pods and get the logs for each pod
@@ -53,9 +54,10 @@ func PrintPodLogs(ctx context.Context, clientset *kubernetes.Clientset, namespac
 
 		// Get the logs for the pod
 		req := clientset.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{})
-		podLogs, err := req.Stream(context.Background())
+		podLogs, err := req.Stream(ctx)
 		if err != nil {
 			fmt.Printf("error getting logs for pod %s: %s\n", pod.Name, err)
+			continue
 		}
 
 		// Read the logs

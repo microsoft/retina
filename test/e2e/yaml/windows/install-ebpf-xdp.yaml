@@ -19,7 +19,7 @@ spec:
         command:
           - powershell.exe
           - -command
-          - '& .\install-ebpf-xdp.ps1 ; while ($true) { Start-Sleep -Seconds 300; }'
+          - '$ErrorActionPreference = "Stop"; try { & .\install-ebpf-xdp.ps1 } catch { Write-Error $_ -ErrorAction Continue; exit 1 }; while ($true) { Start-Sleep -Seconds 300; }'
         readinessProbe:
           exec:
             command:

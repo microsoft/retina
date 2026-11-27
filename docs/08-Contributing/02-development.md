@@ -90,6 +90,84 @@ make retina-image # also pushes to image registry
 make retina-operator-image
 ```
 
+#### Windows agent images
+
+##### Local development from Linux or WSL
+
+With Docker/Buildx and an existing GHCR login, build and push both Windows Server
+2022 and 2025 development images:
+
+```bash
+make make-win TAG=dev
+
+# Build and push only one Windows version.
+make make-win YEAR=2025 TAG=dev
+
+# Export archives instead of pushing.
+make make-win TAG=dev BUILDX_ACTION=
+```
+
+Tags are `ghcr.io/<owner>/retina/retina-agent:dev-local-windows-ltsc<year>-amd64`.
+Omit `TAG` for the same Git-derived base tag as Linux builds; override
+`IMAGE_NAMESPACE` or `IMAGE_REGISTRY` to change the destination.
+Archives are written to `artifacts/`, one per Windows version. A custom
+`WINDOWS_LOCAL_ARCHIVE` requires selecting a single `YEAR`.
+
+**Development only:** [Dockerfile.local](../../hack/windows/Dockerfile.local)
+packages unsigned binaries without CVE-2013-3900 registry hardening, separately
+from production build outputs. Linux can assemble but cannot run these Windows
+containers; load an archive on a compatible Windows host with
+`docker load --input <archive>`.
+
+##### Native Windows packaging
+
+On a matching Windows Docker host, package prebuilt binaries (signed for
+production) without rebuilding or signing them:
+
+```bash
+make retina-image-win WINDOWS_YEARS=2025 TAG=local \
+  REPO_PATH=. BINARIES_PATH=output/windows_amd64
+```
+
+To cross-compile the binaries separately, run `make build-windows-binaries`;
+the default output is `output/windows_amd64`. Both Windows variants use the same
+binaries, but their production Dockerfiles require native Windows registry commands.
+
+##### Multi-platform manifests
+
+After publishing production-style Windows and Linux images under the same base tag:
+
+```bash
+make manifest-retina-image TAG=<tag> WINDOWS_YEARS="2025 2022"
+```
+
+Keep WS2025 first: affected WS2025 containerd versions select the first Windows
+variant even when `os.version` metadata is present.
+
+For an AMD64-only development deployment, build all Linux components and both local
+Windows variants, then publish their shared manifests:
+
+```bash
+export TAG=win25-test
+make retina-image retina-operator-image retina-shell-image \
+  kubectl-retina-image kubectl-retina-shell-image \
+  PLATFORM=linux/amd64 GOARCH=amd64 OUTPUT_LOCAL= BUILDX_ACTION=--push
+make make-win
+for component in retina operator shell kubectl-retina kubectl-retina-shell; do
+  make manifest COMPONENT="$component" LINUX_PLATFORMS=linux/amd64 \
+    WINDOWS_YEARS="2025 2022" WINDOWS_TAG_PREFIX="$TAG-local"
+done
+```
+
+`WINDOWS_TAG_PREFIX="$TAG-local"` selects development Windows images.
+Deploy the shared `$TAG`, not a platform-specific tag; both Windows versions use
+the same Windows DaemonSet. Normal releases also include Linux ARM64 by default.
+
+The agent manifest helper preserves Windows `os.version` metadata: `10.0.20348.*` for
+2022 and `10.0.26100.*` for 2025. Validate image selection, startup, metrics, and
+captures on AKS nodes of both versions; unit and image-build checks do not replace
+runtime validation after containerd updates.
+
 ### Scanning container images
 
 Build and load all five Linux images locally before scanning them:
@@ -133,6 +211,33 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ```
 
 ### Test
+
+#### Windows E2E
+
+The E2E suite runs once in one cluster with a WS2022 (`win22`) and a WS2025 (`win25`)
+node pool, using the same multi-platform Retina image tag. Linux, Hubble and capture
+scenarios run once; the Windows HNS and eBPF metric scenarios run per version, each
+with a pod pinned to that version's node build. The basic phase runs the Windows
+agent in HNS mode and the advanced phase in eBPF mode (`CiliumOnWindows` 0 or 1,
+set on every Windows node before the agent starts). The run fails if a node's running
+Retina image has the wrong `os.version`, for example a WS2025 node selecting the
+WS2022 image. Azure NPM is retained for the Linux drop scenarios only.
+
+```bash
+go test -v ./test/e2e/. -run '^TestE2ERetina$' -tags=e2e -timeout 75m -count=1 \
+  -args -windows-year=both -image-tag=<tag> \
+  -image-registry=<registry> -image-namespace=<namespace>
+```
+
+The tag must contain both Windows images with `os.version` metadata, WS2025 first.
+`-windows-year=2022` or `2025` (the `windows_year` workflow input) runs a single
+version against a cluster with only that pool. Set `EVENT_WRITER_IMAGE` to override
+the event-writer image.
+
+The installer pins the eBPF runtime version used by the event-writer SDK, replaces
+incompatible preinstalled eBPF drivers (as on WS2025 nodes), and exits non-zero on
+failure so Kubernetes restarts the container. Use disposable clusters: the suite
+modifies node drivers and runtime libraries.
 
 ```bash
 make test # run unit-tests locally
@@ -247,6 +352,7 @@ Retina has Dockerfiles in multiple directories, and each is tracked separately b
 - `/test/image` - Test images (daily checks)
 - `/hack/tools/kapinger` - Kapinger tool images (weekly checks)
 - `/hack/tools/toolbox` - Toolbox utility images (weekly checks)
+- `/hack/windows` - Local Windows images for Server 2022 and 2025 (weekly checks)
 
 When Dependabot detects a security vulnerability (CVE) in a base image, it will automatically create a pull request to update the image SHA to a patched version.
 

@@ -5,7 +5,9 @@
 package common
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 	"os/user"
 	"path/filepath"
 	"strconv"
@@ -30,6 +32,7 @@ var (
 	Architectures  = []string{"amd64", "arm64"}
 	CreateInfra    = flag.Bool("create-infra", true, "create a Resource group, vNET and AKS cluster for testing")
 	DeleteInfra    = flag.Bool("delete-infra", true, "delete a Resource group, vNET and AKS cluster for testing")
+	WindowsYear    = flag.String("windows-year", "both", "Windows Server versions to provision and validate in one cluster: 2022, 2025, or both")
 	ScaleTestInfra = ScaleTestInfraHandler{
 		location:       params.Location,
 		subscriptionID: params.SubscriptionID,
@@ -42,6 +45,21 @@ var (
 	// a new k8s cluster will be created
 	KubeConfig = flag.String("kubeConfig", "", "Path to kubeconfig file")
 )
+
+var ErrUnsupportedWindowsYear = errors.New("unsupported Windows year")
+
+func WindowsYears(selection string) ([]string, error) {
+	switch selection {
+	case "both":
+		return []string{"2022", "2025"}, nil
+	case "2022":
+		return []string{"2022"}, nil
+	case "2025":
+		return []string{"2025"}, nil
+	default:
+		return nil, fmt.Errorf("%w %q: use 2022, 2025, or both", ErrUnsupportedWindowsYear, selection)
+	}
+}
 
 var (
 	RetinaChartPath = func(rootDir string) string {

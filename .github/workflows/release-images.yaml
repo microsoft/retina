@@ -100,7 +100,7 @@ jobs:
 
     strategy:
       matrix:
-        year: ["2022"]
+        year: ["2022", "2025"]
         platform: ["windows"]
         arch: ["amd64"]
 
@@ -339,6 +339,7 @@ jobs:
           set -euo pipefail
           make manifest \
             IMAGE_NAMESPACE=${{ github.repository }} \
+            WINDOWS_YEARS="2025 2022" \
             COMPONENT=${{ matrix.component }}
 
       - name: Sign manifest
