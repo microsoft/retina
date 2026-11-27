@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/zap v1.28.0
 	k8s.io/client-go v0.36.4
-	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.26.2
+	sigs.k8s.io/cloud-provider-azure/pkg/azclient v0.26.3
 	sigs.k8s.io/cloud-provider-azure/pkg/azclient/configloader v0.14.0
 )
 
@@ -154,9 +154,9 @@ require (
 	go.etcd.io/etcd/client/v3 v3.6.12 // indirect
 	go.uber.org/dig v1.17.1 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
-	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/mod v0.43.0
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
@@ -184,7 +184,7 @@ require (
 	golang.org/x/oauth2 v0.38.0 // indirect
 	golang.org/x/sync v0.25.0
 	golang.org/x/sys v0.50.0
-	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.4
@@ -203,16 +203,16 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4 v4.8.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/dashboard/armdashboard v1.2.0
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor v0.11.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitorworkspaces v1.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v5 v5.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.3
 	github.com/Microsoft/hcsshim v0.15.0
 	github.com/aws/aws-sdk-go-v2 v1.48.0
-	github.com/aws/aws-sdk-go-v2/config v1.33.18
-	github.com/aws/aws-sdk-go-v2/credentials v1.21.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.10
+	github.com/aws/aws-sdk-go-v2/config v1.33.19
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.1
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.115.0
 	github.com/cakturk/go-netstat v0.0.0-20200220111822-e5b49efee7a5
 	github.com/cilium/cilium v1.20.2
 	github.com/cilium/ebpf v0.22.0
