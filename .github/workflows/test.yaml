@@ -114,6 +114,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Test Windows installer recovery
+        shell: pwsh
+        run: ./test/e2e/tools/event-writer/install-ebpf-xdp.Tests.ps1
+
       - name: Setup Go
         uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:

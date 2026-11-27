@@ -1,14 +1,15 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: non-hpc-pod
+  name: non-hpc-pod-{{WINDOWS_YEAR}}
   annotations:
     retina.sh: observe
   labels:
-    app: non-hpc
+    app: non-hpc-{{WINDOWS_YEAR}}
 spec:
   nodeSelector:
     "kubernetes.io/os": windows
+    "node.kubernetes.io/windows-build": "{{WINDOWS_BUILD}}"
   containers:
   - name: non-hpc-container
     image: "{{CONTAINER_IMAGE}}"

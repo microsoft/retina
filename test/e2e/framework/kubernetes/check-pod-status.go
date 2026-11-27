@@ -37,7 +37,6 @@ func (w *WaitPodsReady) Prevalidate() error {
 // Primary step where test logic is executed
 // Returning an error will cause the test to fail
 func (w *WaitPodsReady) Run() error {
-
 	config, err := clientcmd.BuildConfigFromFlags("", w.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -59,7 +58,6 @@ func (w *WaitPodsReady) Stop() error {
 }
 
 func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, namespace, labelSelector string) error {
-
 	printIterator := 0
 	// Retry a pod list error only when ctx has a deadline, so that the wait
 	// still ends if the API server does not come back.
@@ -109,7 +107,9 @@ func WaitForPodReady(ctx context.Context, clientset *kubernetes.Clientset, names
 
 	err := wait.PollUntilContextCancel(ctx, RetryIntervalPodsReady, true, conditionFunc)
 	if err != nil {
-		PrintPodLogs(ctx, clientset, namespace, labelSelector)
+		logCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		PrintPodLogs(logCtx, clientset, namespace, labelSelector)
 		return fmt.Errorf("error waiting for pods in namespace \"%s\" with label \"%s\" to be in Running state: %w", namespace, labelSelector, err)
 	}
 	return nil

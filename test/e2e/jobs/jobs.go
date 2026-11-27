@@ -81,6 +81,7 @@ func CreateTestInfra(subID, rg, clusterName, location, kubeConfigFilePath string
 
 		job.AddStep(&azure.CreateNPMCluster{
 			ClusterName:  clusterName,
+			WindowsYear:  *common.WindowsYear,
 			PodCidr:      "10.128.0.0/9",
 			DNSServiceIP: "192.168.0.10",
 			ServiceCidr:  "192.168.0.0/28",
@@ -166,15 +167,22 @@ func InstallEbpfXdp(kubeConfigFilePath string) *types.Job {
 	return job
 }
 
-func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, testPodNamespace string) *types.Job {
+func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath, testPodNamespace string, windowsYears []string) *types.Job {
 	job := types.NewJob("Install and test Retina with basic metrics")
 
-	job.AddStep(&kubernetes.InstallHelmChart{
-		Namespace:          common.KubeSystemNamespace,
-		ReleaseName:        "retina",
+	job.AddStep(&kubernetes.SetWindowsMetricMode{
 		KubeConfigFilePath: kubeConfigFilePath,
-		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
+	}, nil)
+
+	job.AddStep(&kubernetes.InstallHelmChart{
+		Namespace:   common.KubeSystemNamespace,
+		ReleaseName: "retina",
+		ChartPath:   chartPath,
+		TagEnv:      generic.DefaultTagEnv,
+	}, nil)
+
+	job.AddStep(&windows.ValidateImage{
+		Years: windowsYears,
 	}, nil)
 
 	dnsScenarios := []struct {
@@ -228,7 +236,9 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 		}
 	}
 
-	job.AddScenario(windows.ValidateWindowsBasicMetric())
+	for _, year := range windowsYears {
+		job.AddScenario(windows.ValidateWindowsBasicMetric(year))
+	}
 
 	job.AddStep(&kubernetes.EnsureStableComponent{
 		PodNamespace:           common.KubeSystemNamespace,
@@ -239,17 +249,21 @@ func InstallAndTestRetinaBasicMetrics(kubeConfigFilePath, chartPath string, test
 	return job
 }
 
-func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath string, testPodNamespace string) *types.Job {
+func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFilePath, testPodNamespace string, windowsYears []string) *types.Job {
 	job := types.NewJob("Upgrade and test Retina with advanced metrics")
+
+	job.AddStep(&kubernetes.SetWindowsMetricMode{
+		KubeConfigFilePath: kubeConfigFilePath,
+		EnableEBPF:         true,
+	}, nil)
 
 	// enable advanced metrics
 	job.AddStep(&kubernetes.UpgradeRetinaHelmChart{
-		Namespace:          common.KubeSystemNamespace,
-		ReleaseName:        "retina",
-		KubeConfigFilePath: kubeConfigFilePath,
-		ChartPath:          chartPath,
-		TagEnv:             generic.DefaultTagEnv,
-		ValuesFile:         valuesFilePath,
+		Namespace:   common.KubeSystemNamespace,
+		ReleaseName: "retina",
+		ChartPath:   chartPath,
+		TagEnv:      generic.DefaultTagEnv,
+		ValuesFile:  valuesFilePath,
 	}, nil)
 
 	dnsScenarios := []struct {
@@ -293,15 +307,6 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		},
 	}
 
-	// Validate Windows BPF Metrics
-	job.AddStep(&kubernetes.ApplyYamlConfig{
-		KubeConfigFilePath: kubeConfigFilePath,
-		YamlFilePath:       "yaml/windows/non-hpc-pod.yaml",
-		ContainerImage:     eventWriterImage(),
-	}, &types.StepOptions{
-		SkipSavingParametersToJob: true,
-	})
-
 	for _, arch := range common.Architectures {
 		for _, scenario := range dnsScenarios {
 			name := scenario.name + " - Arch: " + arch
@@ -309,7 +314,9 @@ func UpgradeAndTestRetinaAdvancedMetrics(kubeConfigFilePath, chartPath, valuesFi
 		}
 	}
 
-	job.AddScenario(windows.ValidateWinBpfMetricScenario())
+	for _, year := range windowsYears {
+		job.AddScenario(windows.ValidateWinBpfMetricScenario(year, eventWriterImage()))
+	}
 	job.AddScenario(latency.ValidateLatencyMetric(testPodNamespace))
 
 	job.AddStep(&kubernetes.EnsureStableComponent{

@@ -138,8 +138,11 @@ binaries, but their production Dockerfiles require native Windows registry comma
 After publishing production-style Windows and Linux images under the same base tag:
 
 ```bash
-make manifest-retina-image TAG=<tag> WINDOWS_YEARS="2022 2025"
+make manifest-retina-image TAG=<tag> WINDOWS_YEARS="2025 2022"
 ```
+
+Keep WS2025 first: affected WS2025 containerd versions select the first Windows
+variant even when `os.version` metadata is present.
 
 For an AMD64-only development deployment, build all Linux components and both local
 Windows variants, then publish their shared manifests:
@@ -152,7 +155,7 @@ make retina-image retina-operator-image retina-shell-image \
 make make-win
 for component in retina operator shell kubectl-retina kubectl-retina-shell; do
   make manifest COMPONENT="$component" LINUX_PLATFORMS=linux/amd64 \
-    WINDOWS_YEARS="2022 2025" WINDOWS_TAG_PREFIX="$TAG-local"
+    WINDOWS_YEARS="2025 2022" WINDOWS_TAG_PREFIX="$TAG-local"
 done
 ```
 
@@ -208,6 +211,33 @@ debug   packetforward   Received PacketForward data     {"Data": "IngressBytes:8
 ```
 
 ### Test
+
+#### Windows E2E
+
+The E2E suite runs once in one cluster with a WS2022 (`win22`) and a WS2025 (`win25`)
+node pool, using the same multi-platform Retina image tag. Linux, Hubble and capture
+scenarios run once; the Windows HNS and eBPF metric scenarios run per version, each
+with a pod pinned to that version's node build. The basic phase runs the Windows
+agent in HNS mode and the advanced phase in eBPF mode (`CiliumOnWindows` 0 or 1,
+set on every Windows node before the agent starts). The run fails if a node's running
+Retina image has the wrong `os.version`, for example a WS2025 node selecting the
+WS2022 image. Azure NPM is retained for the Linux drop scenarios only.
+
+```bash
+go test -v ./test/e2e/. -run '^TestE2ERetina$' -tags=e2e -timeout 75m -count=1 \
+  -args -windows-year=both -image-tag=<tag> \
+  -image-registry=<registry> -image-namespace=<namespace>
+```
+
+The tag must contain both Windows images with `os.version` metadata, WS2025 first.
+`-windows-year=2022` or `2025` (the `windows_year` workflow input) runs a single
+version against a cluster with only that pool. Set `EVENT_WRITER_IMAGE` to override
+the event-writer image.
+
+The installer pins the eBPF runtime version used by the event-writer SDK, replaces
+incompatible preinstalled eBPF drivers (as on WS2025 nodes), and exits non-zero on
+failure so Kubernetes restarts the container. Use disposable clusters: the suite
+modifies node drivers and runtime libraries.
 
 ```bash
 make test # run unit-tests locally

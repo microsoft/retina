@@ -32,12 +32,19 @@ var (
 )
 
 type ValidateHNSMetric struct {
+	Year                     string
 	KubeConfigFilePath       string
 	RetinaDaemonSetNamespace string
 	RetinaDaemonSetName      string
+	NonHpcPodName            string
+	NonHpcAppName            string
 }
 
 func (v *ValidateHNSMetric) Run() error {
+	err := k8s.WaitForPodReadyWithTimeOut(context.Background(), v.KubeConfigFilePath, "default", "app="+v.NonHpcAppName, 15*time.Minute)
+	if err != nil {
+		return fmt.Errorf("waiting for the Windows HNS workload: %w", err)
+	}
 	config, err := clientcmd.BuildConfigFromFlags("", v.KubeConfigFilePath)
 	if err != nil {
 		return fmt.Errorf("error building kubeconfig: %w", err)
@@ -48,21 +55,27 @@ func (v *ValidateHNSMetric) Run() error {
 		return fmt.Errorf("error creating Kubernetes client: %w", err)
 	}
 
+	targetNodeName, err := validateWorkloadNode(context.TODO(), clientset, "default", v.NonHpcPodName, v.Year)
+	if err != nil {
+		return err
+	}
+
 	pods, err := clientset.CoreV1().Pods(v.RetinaDaemonSetNamespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "k8s-app=retina",
+		LabelSelector: retinaLabelSelector,
 	})
 	if err != nil {
-		panic(err.Error())
+		return fmt.Errorf("listing Windows Retina pods: %w", err)
 	}
 
 	var windowsRetinaPod *v1.Pod
 	for pod := range pods.Items {
-		if pods.Items[pod].Spec.NodeSelector["kubernetes.io/os"] == "windows" {
+		if pods.Items[pod].Spec.NodeSelector["kubernetes.io/os"] == "windows" && pods.Items[pod].Spec.NodeName == targetNodeName {
 			windowsRetinaPod = &pods.Items[pod]
+			break
 		}
 	}
 	if windowsRetinaPod == nil {
-		return ErrorNoWindowsPod
+		return fmt.Errorf("%w on node %s", ErrorNoWindowsPod, targetNodeName)
 	}
 
 	labels := map[string]string{
@@ -93,7 +106,9 @@ func (v *ValidateHNSMetric) Run() error {
 
 		return nil
 	})
-
+	if err != nil {
+		return fmt.Errorf("validating Windows HNS metrics: %w", err)
+	}
 	log.Printf("found metric matching %+v: with labels %+v\n", hnsMetricName, labels)
 	return nil
 }

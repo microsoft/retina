@@ -20,6 +20,8 @@ import (
 
 // TestE2ERetina tests all e2e scenarios for retina
 func TestE2ERetina(t *testing.T) {
+	windowsYears, err := common.WindowsYears(*common.WindowsYear)
+	require.NoError(t, err)
 	ctx, cancel := helpers.Context(t)
 	defer cancel()
 
@@ -54,7 +56,8 @@ func TestE2ERetina(t *testing.T) {
 		jobs.InstallAndTestRetinaBasicMetrics(
 			common.KubeConfigFilePath(rootDir),
 			common.RetinaChartPath(rootDir),
-			common.TestPodNamespace),
+			common.TestPodNamespace,
+			windowsYears),
 	)
 	basicMetricsE2E.Run(ctx)
 
@@ -64,7 +67,8 @@ func TestE2ERetina(t *testing.T) {
 			common.KubeConfigFilePath(rootDir),
 			common.RetinaChartPath(rootDir),
 			common.RetinaAdvancedWithEbpfWindowsProfilePath(rootDir),
-			common.TestPodNamespace),
+			common.TestPodNamespace,
+			windowsYears),
 	)
 	advanceMetricsE2E.Run(ctx)
 

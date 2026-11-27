@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	armcontainerservice "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v4"
+	"github.com/microsoft/retina/test/e2e/common"
 )
 
 var (
@@ -36,9 +37,13 @@ type CreateNPMCluster struct {
 	DNSServiceIP      string
 	ServiceCidr       string
 	PublicIPs         []string
+	WindowsYear       string
 }
 
 func (c *CreateNPMCluster) Prevalidate() error {
+	if _, err := common.WindowsYears(c.WindowsYear); err != nil {
+		return fmt.Errorf("selecting Windows pools: %w", err)
+	}
 	return nil
 }
 
@@ -47,24 +52,34 @@ func (c *CreateNPMCluster) Stop() error {
 }
 
 func (c *CreateNPMCluster) Run() error {
+	windowsYears, err := common.WindowsYears(c.WindowsYear)
+	if err != nil {
+		return fmt.Errorf("selecting Windows pools: %w", err)
+	}
 	// Start with default cluster template
 	npmCluster := GetStarterClusterTemplate(c.Location)
 
 	npmCluster.Properties.NetworkProfile.NetworkPolicy = to.Ptr(armcontainerservice.NetworkPolicyAzure)
 
-	//nolint:appendCombine // separate for verbosity
-	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
-		Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		Count:              to.Ptr[int32](AuxilaryNodeCount),
-		EnableNodePublicIP: to.Ptr(false),
-		Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
-		OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
-		OSSKU:              to.Ptr(armcontainerservice.OSSKUWindows2022),
-		ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
-		VMSize:             to.Ptr(AgentWindowsSKU),
-		Name:               to.Ptr("ws22"),
-		MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
-	})
+	for _, year := range windowsYears {
+		osSKU := armcontainerservice.OSSKUWindows2022
+		if year == "2025" {
+			osSKU = armcontainerservice.OSSKU("Windows2025")
+		}
+		//nolint:appendCombine // separate for verbosity
+		npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{ //nolint:all
+			Type:               to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
+			Count:              to.Ptr[int32](AuxilaryNodeCount),
+			EnableNodePublicIP: to.Ptr(false),
+			Mode:               to.Ptr(armcontainerservice.AgentPoolModeUser),
+			OSType:             to.Ptr(armcontainerservice.OSTypeWindows),
+			OSSKU:              to.Ptr(osSKU),
+			ScaleDownMode:      to.Ptr(armcontainerservice.ScaleDownModeDelete),
+			VMSize:             to.Ptr(AgentWindowsSKU),
+			Name:               to.Ptr("win" + year[2:]),
+			MaxPods:            to.Ptr(int32(MaxPodsPerNode)),
+		})
+	}
 
 	//nolint:appendCombine // separate for verbosity
 	npmCluster.Properties.AgentPoolProfiles = append(npmCluster.Properties.AgentPoolProfiles, &armcontainerservice.ManagedClusterAgentPoolProfile{

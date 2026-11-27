@@ -329,6 +329,26 @@ Function Enable-TestSigning
 
 #region Public
 
+Function Assert-eBPFVersion
+{
+   Param([String] $Path)
+
+   If(-Not (Test-Path -LiteralPath $Path))
+   {
+      Write-Warning "$Path is not present"
+      Return $false
+   }
+
+   $version = (Get-Item -LiteralPath $Path -ErrorAction Stop).VersionInfo.ProductVersion
+   If($version -ne $Script:eBPFVersion)
+   {
+      Write-Warning "$Path has eBPF version $version, expected $Script:eBPFVersion"
+      Return $false
+   }
+
+   Return $true
+}
+
 <#
  .Name
    Assert-WindowsEbpfXdpIsReady
@@ -375,10 +395,14 @@ Function Assert-WindowsEbpfXdpIsReady
    }
 
    # Verify EbpfApi.dll in System32
-   If(-Not (Test-Path "$env:WinDir\System32\EbpfApi.dll"))
+   If(-Not (Assert-eBPFVersion -Path "$env:WinDir\System32\EbpfApi.dll"))
    {
       $isReady = $false
-      Write-Warning -Message:"`tEbpfApi.dll is not present in System32"
+   }
+
+   If(-Not (Assert-eBPFVersion -Path "$env:ProgramFiles\ebpf-for-windows\EbpfApi.dll"))
+   {
+      $isReady = $false
    }
 
    # Verify retinaebpfapi.dll in System32
@@ -431,42 +455,80 @@ Function Install-eBPF
          If(-Not (Enable-TestSigning -Reboot)) { Throw }
       }
 
-      If(Assert-SoftwareInstalled -ServiceName:"eBPFCore")
+      $ebpfApiSource = "$($env:ProgramFiles)\ebpf-for-windows\EbpfApi.dll"
+      $ebpfApiDest = "$env:WinDir\System32\EbpfApi.dll"
+      $registeredRuntimes = @(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction Stop |
+         Where-Object { $_.DisplayName -eq 'eBPF for Windows' })
+      $incompatibleRuntimes = @($registeredRuntimes | Where-Object { $_.DisplayVersion -ne $Script:eBPFVersion })
+
+      If($incompatibleRuntimes.Count -eq 0 -And
+         (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -And
+         (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent) -And
+         (Assert-eBPFVersion -Path $ebpfApiSource))
       {
          Write-Host 'extended Berkley Packet Filter for Windows is already installed'
-         return $isSuccess
       }
-
-      Write-Host 'Installing extended Berkley Packet Filter for Windows'
-      # Download eBPF-for-Windows.
-      $packageEbpfUrl  = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v$Script:eBPFVersion/ebpf-for-windows.x64.$Script:eBPFVersion.msi"
-      Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi"
-
-      Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/i", "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi", "/qn", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components") -PassThru | Wait-Process
-      If(-Not (Assert-SoftwareInstalled -ServiceName:'eBPFCore' -Silent) -Or
-         -Not (Assert-SoftwareInstalled -ServiceName:'NetEbpfExt' -Silent))
+      Else
       {
-         Write-Error -Message:"`eBPF service failed to install"
-         Throw
+         $packageEbpfUrl = "https://github.com/microsoft/ebpf-for-windows/releases/download/Release-v$Script:eBPFVersion/ebpf-for-windows.x64.$Script:eBPFVersion.msi"
+         Invoke-WebRequest -Uri $packageEbpfUrl -OutFile "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi" -ErrorAction Stop
+
+         $xdpService = Get-CimInstance Win32_SystemDriver -ErrorAction Stop | Where-Object { $_.Name -eq 'xdp' }
+         If($xdpService -And $xdpService.State -eq 'Running')
+         {
+            Stop-Service -Name xdp -Force -ErrorAction Stop
+         }
+
+         # Driver creation in the pinned MSI runs only on a fresh installation, not repair.
+         ForEach($runtime in $registeredRuntimes)
+         {
+            $productCode = ([Guid] $runtime.PSChildName).ToString('B')
+            $uninstallLog = "$LocalPath\ebpf-for-windows-uninstall-$productCode.log"
+            Write-Host "Uninstalling registered eBPF for Windows $($runtime.DisplayVersion) ($productCode)"
+            $uninstaller = Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList @("/x", $productCode, "/qn", "/norestart", "/l*v", "`"$uninstallLog`"") -Wait -PassThru -ErrorAction Stop
+            If($uninstaller.ExitCode -ne 0)
+            {
+               Throw "eBPF MSI uninstall failed or requires reboot: $($uninstaller.ExitCode); see $uninstallLog"
+            }
+         }
+
+         # Remove only leftover driver registrations, including non-MSI node-image provisioning.
+         $services = Get-CimInstance Win32_SystemDriver -ErrorAction Stop |
+            Where-Object { $_.Name -in @('eBPFCore', 'NetEbpfExt') }
+         ForEach($service in $services)
+         {
+            Stop-Service -Name $service.Name -Force -ErrorAction Stop
+            & sc.exe delete $service.Name | Out-Host
+            If($LASTEXITCODE -ne 0)
+            {
+               Throw "Failed to remove incompatible eBPF service $($service.Name): $LASTEXITCODE"
+            }
+         }
+
+         Write-Host "Installing eBPF for Windows $Script:eBPFVersion"
+         $installLog = "$LocalPath\ebpf-for-windows-install.log"
+         $arguments = @("/i", "$LocalPath\ebpf-for-windows.x64.$Script:eBPFVersion.msi", "/qn", "/norestart", "INSTALLFOLDER=`"$($env:ProgramFiles)\ebpf-for-windows`"", "ADDLOCAL=eBPF_Runtime_Components", "REINSTALLMODE=amus", "/l*v", "`"$installLog`"")
+         $installer = Start-Process -FilePath "$($env:WinDir)\System32\MSIExec.exe" -ArgumentList $arguments -Wait -PassThru -ErrorAction Stop
+         If($installer.ExitCode -ne 0)
+         {
+            Throw "eBPF MSI installation failed or requires reboot: $($installer.ExitCode); see $installLog"
+         }
       }
 
-      $isSuccess = Assert-SoftwareInstalled -ServiceName:"eBPFCore"
+      If(-Not (Assert-eBPFVersion -Path $ebpfApiSource))
+      {
+         Throw 'Installed eBPF runtime does not match the event-writer SDK version'
+      }
 
       # TODO : Remove this once retinaebpfapi.dll can find EbpfApi.dll from the install location.
       # Copy EbpfApi.dll to System32 so dependent DLLs can find it
-      $ebpfApiSource = "$($env:ProgramFiles)\ebpf-for-windows\EbpfApi.dll"
-      $ebpfApiDest = "$env:WinDir\System32\EbpfApi.dll"
-      If((Test-Path $ebpfApiSource) -And -Not (Test-Path $ebpfApiDest))
-      {
-         Copy-Item -Path $ebpfApiSource -Destination $ebpfApiDest -Force
-         Write-Host "EbpfApi.dll copied to $ebpfApiDest"
-      }
+      Copy-Item -Path $ebpfApiSource -Destination $ebpfApiDest -Force -ErrorAction Stop
+      Write-Host "EbpfApi.dll copied to $ebpfApiDest"
    }
    Catch
    {
       $isSuccess = $false
       Write-Host "EBPF install failed : $_"
-      Uninstall-eBPF
    }
 
    Return $isSuccess
@@ -691,7 +753,10 @@ Function Install-XDP
    {
       $isSuccess = $false
       Write-Host "XDP install failed : $_"
-      Uninstall-XDP
+      If(-Not (Uninstall-XDP))
+      {
+         Write-Warning 'Failed to clean up the XDP installation'
+      }
    }
 
    Return $isSuccess
@@ -723,6 +788,11 @@ Function Install-EbpfXdp
          return $true
       }
 
+      If(Test-Path -LiteralPath 'C:\install-ebpf-xdp-probe-ready')
+      {
+         Remove-Item -LiteralPath 'C:\install-ebpf-xdp-probe-ready' -Force -ErrorAction Stop
+      }
+
       If(-Not (Assert-TestSigningIsEnabled -Silent))
       {
          If(-Not (Enable-TestSigning -Reboot)) {Throw}
@@ -747,13 +817,28 @@ Function Install-EbpfXdp
          }
       }
 
+      If(-Not (Install-VCRuntime)) {Throw}
+
       If(-Not (Install-eBPF)) {Throw}
 
       If(-Not (Install-XDP)) {Throw}
 
-      If(-Not (Install-VCRuntime)) {Throw}
-
       If(-Not (Install-RetinaEbpfAPI)) {Throw}
+
+      ForEach($name in @('eBPFCore', 'NetEbpfExt', 'XDP'))
+      {
+         $service = Get-Service -Name $name -ErrorAction Stop
+         If($service.StartType -eq 'Disabled')
+         {
+            Set-Service -Name $name -StartupType Manual -ErrorAction Stop
+         }
+         Start-Service -Name $name -ErrorAction Stop
+      }
+
+      If(-Not (Assert-WindowsEbpfXdpIsReady))
+      {
+         Throw 'eBPF and XDP runtime validation failed'
+      }
 
       Write-Host 'eBPF and XDP for Windows is installed successfully'
       write-Host 'Create the probe ready file'

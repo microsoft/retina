@@ -15,6 +15,11 @@ on:
         required: true
         type: string
         description: The image namespace to use for the E2E tests.
+      windows_year:
+        required: false
+        default: 'both'
+        type: string
+        description: Windows Server versions to test in one cluster (2022, 2025, or both).
       azure_location:
         required: true
         type: string
@@ -72,6 +77,12 @@ on:
         required: true
         type: string
         description: The image namespace to use for the E2E tests.
+      windows_year:
+        required: false
+        default: 'both'
+        type: choice
+        options: ['both', '2022', '2025']
+        description: Windows Server versions to test in one cluster.
       azure_location:
         required: false
         type: string
@@ -147,6 +158,7 @@ jobs:
           USE_EXISTING_INFRA: ${{ inputs.use_existing_infra }}
           INPUT_CLUSTER_NAME: ${{ inputs.cluster_name }}
           INPUT_RESOURCE_GROUP: ${{ inputs.resource_group }}
+          WINDOWS_YEAR: ${{ inputs.windows_year }}
         shell: bash
         run: |
           set -euo pipefail
@@ -161,10 +173,10 @@ jobs:
             DELETE_INFRA=true
           fi
 
-          go test -v ./test/e2e/. -timeout 60m -tags=e2e -count=1  -args -image-tag="$IMAGE_TAG" -image-registry="$IMAGE_REGISTRY" -image-namespace="$IMAGE_NAMESPACE" -create-infra="$CREATE_INFRA" -delete-infra="$DELETE_INFRA"
+          go test -v ./test/e2e/. -run '^TestE2ERetina$' -timeout 75m -tags=e2e -count=1 -args -windows-year="$WINDOWS_YEAR" -image-tag="$IMAGE_TAG" -image-registry="$IMAGE_REGISTRY" -image-namespace="$IMAGE_NAMESPACE" -create-infra="$CREATE_INFRA" -delete-infra="$DELETE_INFRA"
 
       - name: Cleanup resource group
-        if: always()
+        if: always() && !inputs.use_existing_infra
         shell: bash
         run: |
           if az group exists --name "$CLUSTER_NAME" 2>/dev/null | grep -q true; then

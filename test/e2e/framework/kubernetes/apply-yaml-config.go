@@ -23,12 +23,16 @@ const (
 	containerImagePlaceholder = "{{CONTAINER_IMAGE}}"
 )
 
-var errContainerImagePlaceholderNotFound = errors.New("container image placeholder not found in YAML file")
+var (
+	errContainerImagePlaceholderNotFound = errors.New("container image placeholder not found in YAML file")
+	errTemplatePlaceholderNotFound       = errors.New("template placeholder not found in YAML file")
+)
 
 type ApplyYamlConfig struct {
 	KubeConfigFilePath string
 	YamlFilePath       string
 	ContainerImage     string
+	TemplateValues     map[string]string
 }
 
 func (a *ApplyYamlConfig) Run() error {
@@ -61,11 +65,9 @@ func (a *ApplyYamlConfig) Run() error {
 	if err != nil {
 		return fmt.Errorf("error reading YAML file: %w", err)
 	}
-	if a.ContainerImage != "" {
-		if !bytes.Contains(yamlFile, []byte(containerImagePlaceholder)) {
-			return fmt.Errorf("%w: %s", errContainerImagePlaceholderNotFound, a.YamlFilePath)
-		}
-		yamlFile = bytes.ReplaceAll(yamlFile, []byte(containerImagePlaceholder), []byte(a.ContainerImage))
+	yamlFile, err = a.renderYAML(yamlFile)
+	if err != nil {
+		return err
 	}
 
 	reader := bytes.NewReader(yamlFile)
@@ -96,6 +98,22 @@ func (a *ApplyYamlConfig) Run() error {
 
 	log.Printf("applied YAML file: %s\n", a.YamlFilePath)
 	return nil
+}
+
+func (a *ApplyYamlConfig) renderYAML(data []byte) ([]byte, error) {
+	if a.ContainerImage != "" {
+		if !bytes.Contains(data, []byte(containerImagePlaceholder)) {
+			return nil, fmt.Errorf("%w: %s", errContainerImagePlaceholderNotFound, a.YamlFilePath)
+		}
+		data = bytes.ReplaceAll(data, []byte(containerImagePlaceholder), []byte(a.ContainerImage))
+	}
+	for placeholder, value := range a.TemplateValues {
+		if placeholder == "" || !bytes.Contains(data, []byte(placeholder)) {
+			return nil, fmt.Errorf("%w: %q in %s", errTemplatePlaceholderNotFound, placeholder, a.YamlFilePath)
+		}
+		data = bytes.ReplaceAll(data, []byte(placeholder), []byte(value))
+	}
+	return data, nil
 }
 
 func (a *ApplyYamlConfig) Prevalidate() error {

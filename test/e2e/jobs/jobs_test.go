@@ -7,6 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWindowsMetricJobsValidate(t *testing.T) {
+	years := []string{"2022", "2025"}
+	require.NoError(t, InstallAndTestRetinaBasicMetrics("test-kubeconfig", "test-chart", "test-namespace", years).Validate())
+	require.NoError(t, UpgradeAndTestRetinaAdvancedMetrics("test-kubeconfig", "test-chart", "test-values", "test-namespace", years).Validate())
+}
+
 func TestEventWriterImage(t *testing.T) {
 	t.Setenv(generic.DefaultImageRegistry, "registry.example.com")
 	t.Setenv(generic.DefaultImageNamespace, "candidate/retina")
